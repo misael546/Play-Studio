@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { MediaItem } from "../../../preload";
+import type { MediaItem } from "../../preload";
 import "./style.css";
 
 declare global { interface Window { playStudio: { openMedia: () => Promise<MediaItem[]>; saveProject: (data: string) => Promise<boolean>; loadProject: () => Promise<string | null> } } }
@@ -19,7 +19,7 @@ function App() {
   const pixelsPerSecond = 48*zoom;
   const addMedia = async () => {
     const items = await window.playStudio.openMedia();
-    setClips(old=>[...old,...items.map((m)=>({...m,start:old.length?Math.max(...old.map(c=>c.start+c.duration)):0,duration:30,track:m.kind}))]);
+    setClips(old=>{let cursor=old.length?Math.max(...old.map(c=>c.start+c.duration)):0;const added=items.map(m=>{const clip={...m,start:cursor,duration:30,track:m.kind};cursor+=30;return clip;});return [...old,...added];});
   };
   const split = () => {
     if(!active || playhead<=active.start || playhead>=active.start+active.duration) return;
@@ -29,7 +29,7 @@ function App() {
   const remove = () => { if(selected){setClips(old=>old.filter(c=>c.id!==selected));setSelected(null);} };
   const copy = () => { if(active) { const clone={...active,id:crypto.randomUUID(),start:active.start+active.duration}; setClips(old=>[...old,clone]); setSelected(clone.id); } };
   const save = async () => { await window.playStudio.saveProject(JSON.stringify({version:1,clips:clips.map(({url,...c})=>c),playhead},null,2)); };
-  const load = async () => { const data=await window.playStudio.loadProject(); if(data){try{const p=JSON.parse(data);setClips(p.clips??[]);setPlayhead(p.playhead??0);}catch{alert("El archivo de proyecto no es válido.");}} };
+  const load = async () => { const data=await window.playStudio.loadProject(); if(data){try{const p=JSON.parse(data);setClips((p.clips??[]).map((clip: Omit<Clip,"url">)=>({...clip,url:"media://local/"+btoa(unescape(encodeURIComponent(clip.path))).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"")})));setPlayhead(p.playhead??0);}catch{alert("El archivo de proyecto no es válido.");}} };
   const time = (s:number)=>{const m=Math.floor(s/60),sec=Math.floor(s%60);return m+":"+String(sec).padStart(2,"0");};
   const selectedMedia = useMemo(()=>clips.find(c=>c.id===selected),[clips,selected]);
   return <div className="app">
