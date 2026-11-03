@@ -1,0 +1,32 @@
+name: Build AdX AutoClose APK
+on:
+  push:
+    paths:
+      - 'AdX-AutoClose/**'
+      - '.github/workflows/adx-autoclose.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build debug APK
+        working-directory: AdX-AutoClose
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdX-AutoClose-debug-apk
+          path: AdX-AutoClose/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
