@@ -366,8 +366,10 @@ function App() {
     const container=timelineScrollRef.current;
     if(!container)return;
     const playheadX=150+playhead*pixelsPerSecond;
-    const visibleRight=container.scrollLeft+container.clientWidth;
-    if(playheadX>visibleRight-100)container.scrollLeft=Math.max(0,playheadX-container.clientWidth*0.75);
+    const visibleLeft=container.scrollLeft+170;
+    const visibleRight=container.scrollLeft+container.clientWidth-100;
+    if(playheadX<visibleLeft)container.scrollLeft=Math.max(0,playheadX-170);
+    else if(playheadX>visibleRight)container.scrollLeft=Math.max(0,playheadX-container.clientWidth*0.75);
   },[playhead,playing,pixelsPerSecond]);
 
   useEffect(()=>{
