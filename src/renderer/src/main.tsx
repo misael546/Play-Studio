@@ -50,6 +50,7 @@ function App() {
   const [projectName, setProjectName] = useState("Proyecto sin título");
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
+  const playbackFrameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const active = clips.find(c => c.id === selected);
   const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
@@ -215,12 +216,25 @@ function App() {
 
   useEffect(()=>{
     if(!playing)return;
-    const timer=window.setInterval(()=>setPlayhead(old=>{
-      const next=old+0.05;
-      if(next>=contentDuration){setPlaying(false);return contentDuration;}
-      return next;
-    }),50);
-    return()=>window.clearInterval(timer);
+    let previousTime=performance.now();
+    const tick=(now:number)=>{
+      const elapsed=Math.max(0,(now-previousTime)/1000);
+      previousTime=now;
+      setPlayhead(old=>{
+        const next=old+elapsed;
+        if(next>=contentDuration){
+          setPlaying(false);
+          return contentDuration;
+        }
+        return next;
+      });
+      playbackFrameRef.current=window.requestAnimationFrame(tick);
+    };
+    playbackFrameRef.current=window.requestAnimationFrame(tick);
+    return()=>{
+      if(playbackFrameRef.current!==null)window.cancelAnimationFrame(playbackFrameRef.current);
+      playbackFrameRef.current=null;
+    };
   },[playing,contentDuration]);
 
   useEffect(()=>{
@@ -261,7 +275,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`,opacity:fadeGain(previewClip,Math.max(0,playhead-previewClip.start))}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`,opacity:fadeGain(previewClip,Math.max(0,playhead-previewClip.start))}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={()=>{}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
