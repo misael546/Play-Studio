@@ -108,7 +108,7 @@ function App() {
       const p=JSON.parse(data);
       setProjectName(p.name??"Proyecto importado");
       setTracks(p.tracks?.length?p.tracks:[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
-      setClips((p.clips??[]).map((clip:any)=>({...clip,fadeIn:clip.fadeIn??0,fadeOut:clip.fadeOut??0,brightness:clip.brightness??0,contrast:clip.contrast??1,saturation:clip.saturation??1,title:clip.title??"",titleSize:clip.titleSize??48,titlePosition:clip.titlePosition??"bottom",url:makeMediaUrl(clip.path)} as Clip)));
+      setClips((p.clips??[]).map((clip:any)=>({...clip,sourceDuration:clip.sourceDuration??clip.duration,volume:clip.volume??1,fadeIn:clip.fadeIn??0,fadeOut:clip.fadeOut??0,brightness:clip.brightness??0,contrast:clip.contrast??1,saturation:clip.saturation??1,title:clip.title??"",titleSize:clip.titleSize??48,titlePosition:clip.titlePosition??"bottom",url:makeMediaUrl(clip.path)} as Clip)));
       setPlayhead(p.playhead??0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
     } catch { alert("El archivo de proyecto no es válido."); }
   };
