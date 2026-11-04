@@ -13,7 +13,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Texto superpuesto por clip, con posición y tamaño ajustables.
 - Ajustes de brillo, contraste y saturación, visibles también en el monitor de vista previa.
 - Exportación con resolución 720p, 1080p o 4K y 24, 30 o 60 FPS.
-- Guardar y abrir proyectos `.playstudio`.
+- Crear, guardar y abrir proyectos `.playstudio`, con confirmación antes de descartar cambios.
 - Exportación MP4 mediante FFmpeg incluido, con progreso, cancelación, mezcla del audio original de los videos y pistas independientes, orden de capas coherente y limitador para reducir saturación.
 
 ## Formatos de entrada
