@@ -69,7 +69,15 @@ app.whenReady().then(() => {
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath) return { canceled: true };
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>a.start-b.start);
-    const audios = safeClips.filter(c => c.kind === "audio");
+    const separateAudios = safeClips.filter(c => c.kind === "audio");
+    const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
+      const probe = spawn(ffmpegExecutable, ["-hide_banner", "-i", clip.path], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+      let probeText = "";
+      probe.stderr.on("data", chunk => { probeText += chunk.toString(); });
+      probe.on("error", () => resolve(false));
+      probe.on("close", () => resolve(/Stream #\d+:\d+.*Audio:/s.test(probeText)));
+    })));
+    const audioSources = [...separateAudios, ...videos.filter((_clip, index) => videoAudioFlags[index])];
     const dimensions:Record<string,[number,number]> = {"720p":[1280,720],"1080p":[1920,1080],"4k":[3840,2160]};
     const [width,height] = dimensions[request.resolution ?? "1080p"] ?? dimensions["1080p"];
     const fps = [24,30,60].includes(request.fps ?? 30) ? (request.fps ?? 30) : 30;
@@ -99,8 +107,8 @@ app.whenReady().then(() => {
       base = next;
     });
     filters.push("[" + base + "]format=yuv420p[vout]");
-    if (audios.length) {
-      audios.forEach((clip, index) => {
+    if (audioSources.length) {
+      audioSources.forEach((clip, index) => {
         const inputIndex = safeClips.indexOf(clip);
         const delay = Math.max(0, Math.round(clip.start * 1000));
         const audioFilters=["atrim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"asetpts=PTS-STARTPTS","volume="+Math.max(0,Math.min(2,clip.volume??1)).toFixed(2)];
@@ -111,7 +119,7 @@ app.whenReady().then(() => {
         audioFilters.push("adelay="+delay+"|"+delay);
         filters.push("["+inputIndex+":a:0]"+audioFilters.join(",")+"[a"+index+"]");
       });
-      filters.push(audios.map((_,i)=>"[a"+i+"]").join("") + "amix=inputs=" + audios.length + ":duration=longest:dropout_transition=0,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
+      filters.push(audioSources.map((_,i)=>"[a"+i+"]").join("") + "amix=inputs=" + audioSources.length + ":duration=longest:dropout_transition=0,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     } else {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
