@@ -14,6 +14,7 @@ declare global {
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
       resetProjectPath: () => Promise<boolean>;
+      acceptLoadedProject: () => Promise<boolean>;
       loadProject: () => Promise<string | null>;
       exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
       cancelExport: () => Promise<boolean>;
@@ -181,6 +182,7 @@ function App() {
       setTracks(normalizedTracks);
       setClips(normalizedClips);
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
+      await window.playStudio.acceptLoadedProject();
     } catch { alert("El archivo de proyecto no es válido."); }
   };
   const newProject = () => {
