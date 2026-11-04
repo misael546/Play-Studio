@@ -79,6 +79,7 @@ function App() {
   const playbackFrameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const playheadRef = useRef(0);
   const active = clips.find(c => c.id === selected);
   const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
   const duration = Math.max(30, contentDuration);
@@ -287,6 +288,8 @@ function App() {
     };
   },[pixelsPerSecond,tracks,playhead]);
 
+  useEffect(()=>{playheadRef.current=playhead;},[playhead]);
+
   useEffect(()=>{
     for(const clip of previewLayers){
       const video=videoRefs.current[clip.id];if(!video)continue;
@@ -332,14 +335,15 @@ function App() {
     const tick=(now:number)=>{
       const elapsed=Math.max(0,(now-previousTime)/1000);
       previousTime=now;
-      setPlayhead(old=>{
-        const next=old+elapsed;
-        if(next>=contentDuration){
-          setPlaying(false);
-          return contentDuration;
-        }
-        return next;
-      });
+      const next=playheadRef.current+elapsed;
+      if(next>=contentDuration){
+        playheadRef.current=contentDuration;
+        setPlayhead(contentDuration);
+        setPlaying(false);
+        return;
+      }
+      playheadRef.current=next;
+      setPlayhead(next);
       playbackFrameRef.current=window.requestAnimationFrame(tick);
     };
     playbackFrameRef.current=window.requestAnimationFrame(tick);
