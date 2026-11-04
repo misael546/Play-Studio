@@ -112,9 +112,12 @@ function App() {
     const onMove=(event:PointerEvent)=>{
       const drag=dragRef.current;if(!drag)return;
       const delta=(event.clientX-drag.x)/pixelsPerSecond;
+      const target= document.elementFromPoint(event.clientX,event.clientY)?.closest("[data-track-id]") as HTMLElement|null;
+      const targetTrack=target?.dataset.trackId;
+      const allowedTrack=targetTrack&&tracks.some(t=>t.id===targetTrack&&t.kind===drag.clip.kind)?targetTrack:drag.clip.track;
       setClips(old=>old.map(c=>{
         if(c.id!==drag.id)return c;
-        if(drag.mode==="move")return {...c,start:Math.max(0,drag.clip.start+delta)};
+        if(drag.mode==="move")return {...c,start:Math.max(0,drag.clip.start+delta),track:allowedTrack};
         if(drag.mode==="left"){
           const change=Math.min(drag.clip.duration-0.15,Math.max(-drag.clip.sourceStart,delta));
           return {...c,start:Math.max(0,drag.clip.start+change),sourceStart:drag.clip.sourceStart+change,duration:drag.clip.duration-change,sourceDuration:drag.clip.duration-change};
@@ -126,13 +129,19 @@ function App() {
     const onUp=()=>{dragRef.current=null;};
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);
     return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);};
-  },[pixelsPerSecond]);
+  },[pixelsPerSecond,tracks]);
 
   useEffect(()=>{
-    const video=videoRef.current;if(!video||!previewClip)return;
-    const wanted=previewClip.sourceStart+Math.max(0,playhead-previewClip.start);
+    const video=videoRef.current;if(!video||!previewClip||playing)return;
+    const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));
     if(Math.abs(video.currentTime-wanted)>0.18) { try{video.currentTime=wanted;}catch{} }
-  },[previewClip?.id,playhead,previewClip?.sourceStart,previewClip?.start]);
+  },[previewClip?.id,playhead,previewClip?.sourceStart,previewClip?.start,previewClip?.duration,playing]);
+
+  useEffect(()=>{
+    const video=videoRef.current;if(!video)return;
+    if(playing&&previewClip)void video.play().catch(()=>setPlaying(false));
+    else video.pause();
+  },[playing,previewClip?.id]);
 
   useEffect(()=>{
     if(!playing)return;
@@ -176,7 +185,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<video ref={videoRef} src={previewClip.url} controls={false} onEnded={()=>setPlaying(false)}/>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<video ref={videoRef} src={previewClip.url} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} onEnded={()=>setPlaying(false)}/>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={()=>setPlaying(v=>!v)}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>setPlayhead(duration)}>⏭</button><span>{time(playhead)} / {time(duration)}</span></div>
       </section>
       <aside className="inspector">
@@ -197,7 +206,7 @@ function App() {
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
         {tracks.map(track=><div className="track-row" key={track.id}>
           <div className="track-label">{track.name}</div>
-          <div className="track-area" style={{width:duration*pixelsPerSecond}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
+          <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
             {clips.filter(c=>c.track===track.id).map(c=><div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
               <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
               <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
