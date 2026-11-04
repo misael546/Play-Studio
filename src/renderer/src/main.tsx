@@ -117,11 +117,15 @@ function App() {
     setTracks(old=>[...old,{id:kind+"-"+count,name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
   };
   const save = async () => {
-    const data={version:2,name:projectName,tracks,clips:clips.map(({url,...c})=>c),playhead};
-    await window.playStudio.saveProject(JSON.stringify(data,null,2));
+    try{
+      const data={version:2,name:projectName,tracks,clips:clips.map(({url,...c})=>c),playhead};
+      await window.playStudio.saveProject(JSON.stringify(data,null,2));
+    }catch(error){alert(error instanceof Error?"No se pudo guardar el proyecto: "+error.message:"No se pudo guardar el proyecto.");}
   };
   const load = async () => {
-    const data=await window.playStudio.loadProject();
+    let data:string|null;
+    try{data=await window.playStudio.loadProject();}
+    catch(error){alert(error instanceof Error?"No se pudo abrir el proyecto: "+error.message:"No se pudo abrir el proyecto.");return;}
     if(!data)return;
     try {
       const p=JSON.parse(data);
