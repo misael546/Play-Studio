@@ -57,6 +57,45 @@ app.whenReady().then(() => {
     const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
     return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind, size: info.size };
   });
+  ipcMain.handle("media:waveform", async (_event, filePath: string, duration: number): Promise<number[]> => {
+    if (typeof filePath !== "string" || !filePath.trim() || !Number.isFinite(duration) || duration <= 0) return [];
+    const info = await stat(filePath);
+    if (!info.isFile()) throw new Error("El archivo de audio no es válido.");
+    const executablePath = ffmpegPath;
+    if (!executablePath) throw new Error("No se encontró FFmpeg para analizar el audio.");
+    const executable = app.isPackaged ? executablePath.replace("app.asar", "app.asar.unpacked") : executablePath;
+    const peakCount = Math.max(30, Math.min(180, Math.ceil(duration * 3)));
+    const samplesPerPeak = Math.max(1, Math.ceil(duration * 1000 / peakCount));
+    const bytesPerPeak = samplesPerPeak * 2;
+    return await new Promise<number[]>((resolve, reject) => {
+      const child = spawn(executable, ["-v", "error", "-i", filePath, "-vn", "-ac", "1", "-ar", "1000", "-f", "s16le", "pipe:1"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+      const peaks: number[] = [];
+      let pending = Buffer.alloc(0);
+      let errorText = "";
+      child.stdout.on("data", (chunk: Buffer) => {
+        const data = pending.length ? Buffer.concat([pending, chunk]) : chunk;
+        let offset = 0;
+        while (offset + bytesPerPeak <= data.length && peaks.length < peakCount) {
+          let maximum = 0;
+          for (let index = offset; index < offset + bytesPerPeak; index += 2) maximum = Math.max(maximum, Math.abs(data.readInt16LE(index)));
+          peaks.push(maximum / 32768);
+          offset += bytesPerPeak;
+        }
+        pending = data.subarray(offset);
+      });
+      child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 3000) errorText = errorText.slice(-3000); });
+      child.on("error", reject);
+      child.on("close", code => {
+        if (code !== 0) { reject(new Error("No se pudo analizar la forma de onda. " + errorText.slice(-900))); return; }
+        if (pending.length >= 2 && peaks.length < peakCount) {
+          let maximum = 0;
+          for (let index = 0; index + 1 < pending.length; index += 2) maximum = Math.max(maximum, Math.abs(pending.readInt16LE(index)));
+          peaks.push(maximum / 32768);
+        }
+        resolve(peaks);
+      });
+    });
+  });
   ipcMain.handle("project:save", async (_event, data: string) => {
     const result = await dialog.showSaveDialog({ defaultPath: "Mi proyecto.playstudio", filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
     if (result.canceled || !result.filePath) return false;
