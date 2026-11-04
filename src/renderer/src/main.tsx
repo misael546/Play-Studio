@@ -125,10 +125,24 @@ function App() {
     if(!data)return;
     try {
       const p=JSON.parse(data);
-      setProjectName(p.name??"Proyecto importado");
-      setTracks(p.tracks?.length?p.tracks:[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
-      setClips((p.clips??[]).map((clip:any)=>({...clip,sourceDuration:clip.sourceDuration??clip.duration,volume:clip.volume??1,fadeIn:clip.fadeIn??0,fadeOut:clip.fadeOut??0,brightness:clip.brightness??0,contrast:clip.contrast??1,saturation:clip.saturation??1,title:clip.title??"",titleSize:clip.titleSize??48,titlePosition:clip.titlePosition??"bottom",url:makeMediaUrl(clip.path)} as Clip)));
-      setPlayhead(p.playhead??0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
+      setProjectName(typeof p.name==="string"&&p.name.trim()?p.name:"Proyecto importado");
+      const defaultTracks:Track[]=[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}];
+      const loadedTracks=Array.isArray(p.tracks)?p.tracks.filter((t:any)=>t&&typeof t.id==="string"&&typeof t.name==="string"&&(t.kind==="video"||t.kind==="audio")) as Track[]:[];
+      const normalizedTracks=loadedTracks.length?[...loadedTracks]:[...defaultTracks];
+      for(const kind of ["video","audio"] as const)if(!normalizedTracks.some(t=>t.kind===kind))normalizedTracks.push({id:kind+"-1",name:(kind==="video"?"VIDEO ":"AUDIO ")+ "1",kind});
+      setTracks(normalizedTracks);
+      const rawClips=Array.isArray(p.clips)?p.clips:[];
+      const validClips=rawClips.filter((clip:any)=>clip&&typeof clip.id==="string"&&typeof clip.name==="string"&&typeof clip.path==="string"&&(clip.kind==="video"||clip.kind==="audio")&&Number.isFinite(clip.start)&&clip.start>=0&&Number.isFinite(clip.duration)&&clip.duration>0&&Number.isFinite(clip.sourceStart)&&clip.sourceStart>=0);
+      if(validClips.length!==rawClips.length)alert("Se omitieron clips dañados o incompletos al abrir el proyecto.");
+      setClips(validClips.map((clip:any)=>{
+        const sourceDuration=Number.isFinite(clip.sourceDuration)&&clip.sourceDuration>0?clip.sourceDuration:clip.sourceStart+clip.duration;
+        const sourceStart=Math.max(0,Math.min(sourceDuration-0.1,clip.sourceStart));
+        const clipDuration=Math.max(0.1,Math.min(clip.duration,sourceDuration-sourceStart));
+        const fallbackTrack=normalizedTracks.find(t=>t.kind===clip.kind)?.id??normalizedTracks[0].id;
+        const track=normalizedTracks.some(t=>t.id===clip.track&&t.kind===clip.kind)?clip.track:fallbackTrack;
+        return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",url:makeMediaUrl(clip.path)} as Clip;
+      }));
+      setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
     } catch { alert("El archivo de proyecto no es válido."); }
   };
   const exportVideo = async () => {
