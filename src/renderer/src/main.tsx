@@ -363,7 +363,7 @@ function App() {
       <aside className="media-panel">
         <div className="panel-heading"><b>MEDIOS DEL PROYECTO</b><button className="plus" onClick={addMedia}>＋</button></div>
         <button className="add-media" onClick={addMedia}>＋ Añadir video o audio</button>
-        <div className="media-list">{clips.map(c=><button key={c.id} className={"media-item "+(selected===c.id?"active":"")} onClick={()=>setSelected(c.id)}><span className="media-icon">{c.kind==="audio"?"♫":"▣"}</span><span>{c.name}</span></button>)}</div>
+        <div className="media-list">{clips.map(c=><button key={c.id} className={"media-item "+(selected===c.id?"active":"")} onClick={()=>{setSelected(c.id);setPlayhead(c.start);setPlaying(false);}}><span className="media-icon">{c.kind==="audio"?"♫":"▣"}</span><span>{c.name}</span></button>)}</div>
         <div className="panel-footer">Importa MP4, MOV, MKV, MP3, WAV y más formatos</div>
       </aside>
       <section className="preview-panel">
