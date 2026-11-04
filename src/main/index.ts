@@ -83,7 +83,7 @@ app.whenReady().then(() => {
           peaks.push(maximum / 32768);
           offset += bytesPerPeak;
         }
-        pending = peaks.length >= peakCount ? Buffer.alloc(0) : data.subarray(offset);
+        pending = peaks.length >= peakCount ? Buffer.alloc(0) : Buffer.from(data.subarray(offset));
       });
       child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 3000) errorText = errorText.slice(-3000); });
       child.on("error", reject);
