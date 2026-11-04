@@ -23,6 +23,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - `Ctrl + N`: nuevo proyecto.
 - `Ctrl + O`: abrir proyecto.
 - `Ctrl + S`: guardar proyecto.
+- `Ctrl + Shift + S`: guardar como.
 - `Espacio`: reproducir o pausar.
 - `← / →`: avanzar o retroceder un fotograma.
 - `S`: dividir el clip seleccionado.
@@ -49,4 +50,4 @@ npm run dist
 El instalador NSIS se genera en la carpeta `release`.
 
 ## Nota técnica
-Esta versión incluye el motor inicial de exportación MP4, fundidos, títulos, ajustes básicos de imagen, mezcla de audio original y pistas independientes. Las transiciones entre clips, la corrección avanzada de sincronización, las transiciones entre clips y las pruebas de uso real siguen pendientes.
+Esta versión incluye el motor inicial de exportación MP4, fundidos, títulos, ajustes básicos de imagen, mezcla de audio original y pistas independientes. Las transiciones avanzadas entre clips, la recuperación automática de proyectos y las pruebas de uso real siguen pendientes.
