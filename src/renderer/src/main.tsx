@@ -383,12 +383,19 @@ function App() {
         {tracks.map(track=><div className="track-row" key={track.id}>
           <div className="track-label">{track.name}</div>
           <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
-            {clips.filter(c=>c.track===track.id).map(c=><div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
-              <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
-              <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
-              <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
-              <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
-            </div>)}
+            {clips.filter(c=>c.track===track.id).map(c=>{
+              const sourceWaveform=c.waveform??[];
+              const waveStart=c.sourceDuration>0?Math.floor(c.sourceStart/c.sourceDuration*sourceWaveform.length):0;
+              const waveEnd=c.sourceDuration>0?Math.ceil((c.sourceStart+c.duration)/c.sourceDuration*sourceWaveform.length):sourceWaveform.length;
+              const visibleWaveform=sourceWaveform.slice(waveStart,Math.max(waveStart+1,waveEnd));
+              return <div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
+                <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
+                <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
+                {track.kind==="audio"&&visibleWaveform.length>0&&<div className="clip-waveform">{visibleWaveform.map((peak,index)=><i key={index} style={{height:Math.max(2,peak*100)+"%"}}/>)}</div>}
+                <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
+                <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
+              </div>;
+            })}
           </div>
         </div>)}
         <div className="playhead" style={{left:150+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
