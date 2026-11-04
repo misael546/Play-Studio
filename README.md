@@ -24,6 +24,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - `Ctrl + O`: abrir proyecto.
 - `Ctrl + S`: guardar proyecto.
 - `Ctrl + Shift + S`: guardar como.
+- `Ctrl + 0`: ajustar la línea de tiempo al contenido.
 - `Espacio`: reproducir o pausar.
 - `← / →`: avanzar o retroceder un fotograma.
 - `S`: dividir el clip seleccionado.
@@ -31,7 +32,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - `Ctrl + Y` o `Ctrl + Shift + Z`: rehacer.
 
 ## Formatos de entrada
-MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La compatibilidad final depende de los códecs incluidos en FFmpeg.
+MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La lectura de duración y la vista previa dependen de los códecs compatibles con Chromium; FFmpeg se usa para analizar audio y exportar.
 
 ## Requisitos de desarrollo
 - Windows 10/11 de 64 bits
