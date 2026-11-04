@@ -29,7 +29,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("media:open", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"], filters: [
-      { name: "Medios compatibles", extensions: ["mp4","mov","mkv","avi","webm","m4v","mp3","wav","aac","m4a","flac","ogg","wma"] },
+      { name: "Medios compatibles", extensions: ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob","mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"] },
       { name: "Todos los archivos", extensions: ["*"] }
     ]});
     if (result.canceled) return [];
@@ -37,7 +37,7 @@ app.whenReady().then(() => {
       const info = await stat(filePath);
       const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
       const ext = name.split(".").pop()?.toLowerCase() ?? "";
-      const audio = ["mp3","wav","aac","m4a","flac","ogg","wma"].includes(ext);
+      const audio = ["mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"].includes(ext);
       return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind: audio ? "audio" : "video", size: info.size };
     }));
   });
