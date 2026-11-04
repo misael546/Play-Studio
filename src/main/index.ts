@@ -103,7 +103,7 @@ app.whenReady().then(() => {
     if (!targetPath || saveAs) {
       const result = await dialog.showSaveDialog({ defaultPath: "Mi proyecto.playstudio", filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
       if (result.canceled || !result.filePath) return false;
-      targetPath = result.filePath;
+      targetPath = result.filePath.toLowerCase().endsWith(".playstudio") ? result.filePath : result.filePath + ".playstudio";
     }
     const fs = await import("node:fs/promises");
     const temporaryPath = targetPath + "." + crypto.randomUUID() + ".tmp";
@@ -169,6 +169,7 @@ app.whenReady().then(() => {
     if (exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath || exportCanceled) { exportCanceled = false; return { canceled: true }; }
+    const outputPath = target.filePath.toLowerCase().endsWith(".mp4") ? target.filePath : target.filePath + ".mp4";
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
     const separateAudios = safeClips.filter(c => c.kind === "audio");
     const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
@@ -224,7 +225,7 @@ app.whenReady().then(() => {
     } else {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
-    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
+    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", outputPath);
     return await new Promise((resolve, reject) => {
       if (exportCanceled) { exportCanceled = false; resolve({ canceled: true }); return; }
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -249,11 +250,11 @@ app.whenReady().then(() => {
         exportProcess = null;
         if (exportCanceled) {
           exportCanceled = false;
-          void unlink(target.filePath).catch(() => {});
+          void unlink(outputPath).catch(() => {});
           resolve({ canceled: true });
         } else if (code === 0) {
           event.sender.send("export:progress", 100);
-          resolve({ canceled: false, path: target.filePath });
+          resolve({ canceled: false, path: outputPath });
         } else reject(new Error("FFmpeg no pudo completar la exportación. " + errorText.slice(-1800)));
       });
     });
