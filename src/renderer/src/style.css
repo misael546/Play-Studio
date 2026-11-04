@@ -22,3 +22,5 @@
 
 .clip-waveform{position:absolute;left:10px;right:10px;bottom:3px;height:16px;display:flex;align-items:center;justify-content:space-between;gap:1px;z-index:2;pointer-events:none;opacity:.78;overflow:hidden}.clip-waveform i{display:block;flex:1;min-width:1px;max-width:3px;background:#83d9c8;border-radius:2px 2px 0 0;align-self:center}
 .clip.audio b,.clip.audio small{position:relative;z-index:4}
+
+.import-overlay{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:18}.import-box{min-width:320px;background:#20242e;border:1px solid #46566b;border-radius:10px;padding:22px;display:grid;gap:10px;box-shadow:0 12px 40px #0009}.import-box span{color:#aeb4c1;font-size:12px}
