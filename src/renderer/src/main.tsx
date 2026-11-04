@@ -76,6 +76,7 @@ function App() {
   };
 
   const addMedia = async () => {
+    try{
     const items = await window.playStudio.openMedia();
     if (!items.length) return;
     const prepared = await Promise.all(items.map(async item => ({...item, mediaDuration: await readDuration(item)})));
@@ -98,6 +99,7 @@ function App() {
       }
       return next;
     });
+    }catch(error){alert(error instanceof Error?"No se pudieron importar los medios: "+error.message:"No se pudieron importar los medios.");}
   };
   const split = () => {
     if (!active || playhead <= active.start + 0.02 || playhead >= active.start + active.duration - 0.02) return;
