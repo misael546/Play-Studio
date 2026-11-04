@@ -218,7 +218,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<video ref={videoRef} src={previewClip.url} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} />:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={()=>setPlaying(v=>!v)}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>setPlayhead(duration)}>⏭</button><span>{time(playhead)} / {time(duration)}</span></div>
       </section>
       <aside className="inspector">
@@ -236,7 +236,7 @@ function App() {
             <label className="volume-property">Contraste <input type="range" min=".5" max="2" step=".05" value={active.contrast} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,contrast:Number(e.target.value)}:c))}/><span>{active.contrast.toFixed(2)}</span></label>
             <label className="volume-property">Saturación <input type="range" min="0" max="2" step=".05" value={active.saturation} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,saturation:Number(e.target.value)}:c))}/><span>{active.saturation.toFixed(2)}</span></label>
           </>}
-          {active.kind==="audio"&&<label className="volume-property">Volumen <input type="range" min="0" max="2" step=".05" value={active.volume} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,volume:Number(e.target.value)}:c))}/><span>{Math.round(active.volume*100)}%</span></label>}
+          {<label className="volume-property">Volumen de clip <input type="range" min="0" max="2" step=".05" value={active.volume} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,volume:Number(e.target.value)}:c))}/><span>{Math.round(active.volume*100)}%</span></label>}
           <button className="danger-button" onClick={remove}>Eliminar clip</button>
         </>:<div className="inspector-empty">Selecciona un clip para ajustar sus propiedades.</div>}
       </aside>
@@ -253,8 +253,8 @@ function App() {
             {clips.filter(c=>c.track===track.id).map(c=><div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
               <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
               <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
-              <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
-              <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
+              <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
+              <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
             </div>)}
           </div>
         </div>)}
