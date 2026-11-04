@@ -150,6 +150,11 @@ function App() {
   },[pixelsPerSecond,tracks]);
 
   useEffect(()=>{
+    const video=videoRef.current;
+    if(video&&previewClip) video.volume=Math.min(1,Math.max(0,previewClip.volume));
+  },[previewClip?.id,previewClip?.volume]);
+
+  useEffect(()=>{
     const video=videoRef.current;if(!video||!previewClip||playing)return;
     const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));
     if(Math.abs(video.currentTime-wanted)>0.18) { try{video.currentTime=wanted;}catch{} }
@@ -186,7 +191,7 @@ function App() {
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
-      if((event.target as HTMLElement)?.tagName==="INPUT")return;
+      const target=event.target as HTMLElement;if(["INPUT","TEXTAREA","SELECT"].includes(target?.tagName)||target?.isContentEditable)return;
       const key=event.key.toLowerCase();
       if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}
       else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}
@@ -218,7 +223,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={()=>setPlaying(v=>!v)}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>setPlayhead(duration)}>⏭</button><span>{time(playhead)} / {time(duration)}</span></div>
       </section>
       <aside className="inspector">
