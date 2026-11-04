@@ -21,8 +21,8 @@ const makeMediaUrl = (path: string) => "media://local/" + btoa(unescape(encodeUR
 const readDuration = (item: MediaItem) => new Promise<number>(resolve => {
   const element = document.createElement(item.kind === "audio" ? "audio" : "video");
   element.preload = "metadata";
-  element.onloadedmetadata = () => resolve(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 10);
-  element.onerror = () => resolve(10);
+  element.onloadedmetadata = () => resolve(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0);
+  element.onerror = () => resolve(0);
   element.src = item.url;
 });
 const fadeGain = (clip: Clip, elapsed: number) => {
@@ -75,13 +75,17 @@ function App() {
     const items = await window.playStudio.openMedia();
     if (!items.length) return;
     const prepared = await Promise.all(items.map(async item => ({...item, mediaDuration: await readDuration(item)})));
+    const valid = prepared.filter(item => item.mediaDuration > 0);
+    const invalid = prepared.filter(item => item.mediaDuration <= 0);
+    if(invalid.length)alert("No se pudo leer la duración de estos archivos y no se añadieron:\\n"+invalid.map(item=>item.name).join("\\n")+"\\nComprueba que el archivo no esté dañado y que Windows pueda reproducirlo.");
+    if(!valid.length)return;
     commitClips(old => {
       const next = [...old];
       const cursors: Record<"video"|"audio",number> = {
         video: Math.max(0, ...next.filter(c=>c.kind==="video").map(c=>c.start+c.duration)),
         audio: Math.max(0, ...next.filter(c=>c.kind==="audio").map(c=>c.start+c.duration))
       };
-      for (const item of prepared) {
+      for (const item of valid) {
         const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
         const {mediaDuration, ...media} = item;
         const clip: Clip = {...media, start: cursors[item.kind], duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
