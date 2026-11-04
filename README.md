@@ -6,6 +6,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Importar video y audio desde el explorador de Windows.
 - Lectura de duración de medios, rechazo de archivos cuya duración no se puede leer y biblioteca del proyecto.
 - Varias pistas de video y audio, con capas superpuestas en el monitor y orden de composición según la pista.
+- Formas de onda de audio generadas con FFmpeg y ajustadas al recorte del clip.
 - Selección, mover clips, recortar bordes, dividir, cortar, copiar, pegar y eliminar.
 - Cabezal de reproducción controlado con clic derecho en la línea de tiempo y avance sincronizado con reloj real.
 - Propiedades de posición, duración y volumen de clips de video y audio.
