@@ -19,3 +19,6 @@
 .cancel-export{justify-self:center;background:#492b34;border:1px solid #81414e;color:#ffd8de;border-radius:5px;padding:8px 14px;cursor:pointer}.cancel-export:hover{background:#603541}
 
 .relink-button{margin:0 12px 8px;background:#252e3a;border:1px solid #46566b;color:#cbdcf5;border-radius:5px;padding:7px 9px;cursor:pointer;text-align:left}.relink-button:hover{background:#303d4d}
+
+.clip-waveform{position:absolute;left:10px;right:10px;bottom:3px;height:16px;display:flex;align-items:center;justify-content:space-between;gap:1px;z-index:2;pointer-events:none;opacity:.78;overflow:hidden}.clip-waveform i{display:block;flex:1;min-width:1px;max-width:3px;background:#83d9c8;border-radius:2px 2px 0 0;align-self:center}
+.clip.audio b,.clip.audio small{position:relative;z-index:4}
