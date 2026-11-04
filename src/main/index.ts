@@ -9,6 +9,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard:
 let mainWindow: BrowserWindow | null = null;
 let exportProcess: ReturnType<typeof spawn> | null = null;
 let exportCanceled = false;
+let currentProjectPath: string | null = null;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -96,17 +97,25 @@ app.whenReady().then(() => {
       });
     });
   });
-  ipcMain.handle("project:save", async (_event, data: string) => {
-    const result = await dialog.showSaveDialog({ defaultPath: "Mi proyecto.playstudio", filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
-    if (result.canceled || !result.filePath) return false;
+  ipcMain.handle("project:save", async (_event, data: string, saveAs = false) => {
+    let targetPath = currentProjectPath;
+    if (!targetPath || saveAs) {
+      const result = await dialog.showSaveDialog({ defaultPath: "Mi proyecto.playstudio", filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
+      if (result.canceled || !result.filePath) return false;
+      targetPath = result.filePath;
+    }
     const fs = await import("node:fs/promises");
-    await fs.writeFile(result.filePath, data, "utf8");
+    await fs.writeFile(targetPath, data, "utf8");
+    currentProjectPath = targetPath;
     return true;
   });
+  ipcMain.handle("project:reset-path", () => { currentProjectPath = null; return true; });
   ipcMain.handle("project:load", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
     if (result.canceled || !result.filePaths[0]) return null;
-    return readFile(result.filePaths[0], "utf8");
+    const data = await readFile(result.filePaths[0], "utf8");
+    currentProjectPath = result.filePaths[0];
+    return data;
   });
   ipcMain.handle("export:cancel", () => {
     exportCanceled = true;
