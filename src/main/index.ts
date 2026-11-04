@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, net } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFile, stat, unlink } from "node:fs/promises";
+import { readFile, stat, unlink, rename } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
 
@@ -170,6 +170,7 @@ app.whenReady().then(() => {
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath || exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const outputPath = target.filePath.toLowerCase().endsWith(".mp4") ? target.filePath : target.filePath + ".mp4";
+    const temporaryOutputPath = outputPath.replace(/\.mp4$/i, ".partial.mp4");
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
     const separateAudios = safeClips.filter(c => c.kind === "audio");
     const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
@@ -226,7 +227,7 @@ app.whenReady().then(() => {
     } else {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
-    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", outputPath);
+    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", temporaryOutputPath);
     return await new Promise((resolve, reject) => {
       if (exportCanceled) { exportCanceled = false; resolve({ canceled: true }); return; }
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -245,18 +246,28 @@ app.whenReady().then(() => {
       });
       child.on("error", error => {
         exportProcess = null;
+        void unlink(temporaryOutputPath).catch(() => {});
         reject(error);
       });
-      child.on("close", code => {
+      child.on("close", async code => {
         exportProcess = null;
         if (exportCanceled) {
           exportCanceled = false;
-          void unlink(outputPath).catch(() => {});
+          void unlink(temporaryOutputPath).catch(() => {});
           resolve({ canceled: true });
         } else if (code === 0) {
-          event.sender.send("export:progress", 100);
-          resolve({ canceled: false, path: outputPath });
-        } else reject(new Error("FFmpeg no pudo completar la exportación. " + errorText.slice(-1800)));
+          try {
+            await rename(temporaryOutputPath, outputPath);
+            event.sender.send("export:progress", 100);
+            resolve({ canceled: false, path: outputPath });
+          } catch (error) {
+            void unlink(temporaryOutputPath).catch(() => {});
+            reject(error);
+          }
+        } else {
+          void unlink(temporaryOutputPath).catch(() => {});
+          reject(new Error("FFmpeg no pudo completar la exportación. " + errorText.slice(-1800)));
+        }
       });
     });
   });
