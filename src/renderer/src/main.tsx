@@ -55,8 +55,8 @@ function App() {
       let cursor = Math.max(0, ...next.map(c => c.start + c.duration));
       for (const item of prepared) {
         const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
-        const clip: Clip = {...item, start: cursor, duration: item.mediaDuration, sourceStart: 0, sourceDuration: item.mediaDuration, track: track.id, volume: 1};
-        delete (clip as Clip & {mediaDuration?:number}).mediaDuration;
+        const {mediaDuration, ...media} = item;
+        const clip: Clip = {...media, start: cursor, duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1};
         next.push(clip);
         cursor += item.mediaDuration;
       }
