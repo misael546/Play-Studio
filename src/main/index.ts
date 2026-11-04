@@ -62,6 +62,7 @@ app.whenReady().then(() => {
     return true;
   });
   ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {
+    if (exportProcess) throw new Error("Ya hay una exportación en curso.");
     const clips = request.clips;
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
