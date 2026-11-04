@@ -11,6 +11,8 @@ let exportProcess: ReturnType<typeof spawn> | null = null;
 let exportCanceled = false;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
+const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -74,15 +76,16 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {
     if (exportProcess) throw new Error("Ya hay una exportación en curso.");
+    if (!request || typeof request !== "object") throw new Error("La solicitud de exportación no es válida.");
     exportCanceled = false;
-    const clips = request.clips;
+    const clips = Array.isArray(request.clips) ? request.clips : [];
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
     const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     if (!Array.isArray(clips) || clips.length === 0) throw new Error("Agrega al menos un clip a la línea de tiempo.");
     const safeClips: ExportClip[] = [];
     for (const clip of clips) {
-      if (!clip.path || !Number.isFinite(clip.start) || !Number.isFinite(clip.sourceStart) || !Number.isFinite(clip.duration) || clip.duration <= 0 || clip.start < 0 || clip.sourceStart < 0) continue;
+      if (!clip || typeof clip.path !== "string" || !clip.path.trim() || (clip.kind !== "video" && clip.kind !== "audio") || !Number.isFinite(clip.start) || !Number.isFinite(clip.sourceStart) || !Number.isFinite(clip.duration) || clip.duration <= 0 || clip.start < 0 || clip.sourceStart < 0) continue;
       try {
         const fileInfo = await stat(clip.path);
         if (!fileInfo.isFile()) throw new Error("La ruta no corresponde a un archivo.");
@@ -90,7 +93,19 @@ app.whenReady().then(() => {
         const missingName = clip.path.split(/[\\/]/).pop() ?? clip.path;
         throw new Error("No se encuentra el archivo de medio: " + missingName + ". Vuelve a importarlo desde su ubicación original.");
       }
-      safeClips.push(clip);
+      safeClips.push({
+        ...clip,
+        trackOrder: boundedNumber(clip.trackOrder, 0, 0, 1000),
+        volume: boundedNumber(clip.volume, 1, 0, 2),
+        fadeIn: boundedNumber(clip.fadeIn, 0, 0, clip.duration),
+        fadeOut: boundedNumber(clip.fadeOut, 0, 0, clip.duration),
+        brightness: boundedNumber(clip.brightness, 0, -0.5, 0.5),
+        contrast: boundedNumber(clip.contrast, 1, 0.5, 2),
+        saturation: boundedNumber(clip.saturation, 1, 0, 2),
+        title: typeof clip.title === "string" ? clip.title.slice(0, 120) : "",
+        titleSize: boundedNumber(clip.titleSize, 48, 12, 160),
+        titlePosition: ["top", "center", "bottom"].includes(clip.titlePosition ?? "bottom") ? (clip.titlePosition ?? "bottom") : "bottom"
+      });
     }
     if (!safeClips.length) throw new Error("No hay clips válidos para exportar.");
     const totalDuration = Math.max(...safeClips.map(c => c.start + c.duration));
