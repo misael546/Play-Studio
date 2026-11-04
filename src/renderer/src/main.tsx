@@ -13,6 +13,7 @@ declare global {
       saveProject: (data: string) => Promise<boolean>;
       loadProject: () => Promise<string | null>;
       exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
+      cancelExport: () => Promise<boolean>;
       onExportProgress: (callback: (progress: number) => void) => () => void;
     };
   }
@@ -332,7 +333,7 @@ function App() {
       <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
     <div className="audio-players" aria-hidden="true">{clips.filter(c=>c.kind==="audio").map(c=><audio key={c.id} ref={element=>{audioRefs.current[c.id]=element;}} src={c.url} preload="auto"/>)}</div>
-    {exporting&&<div className="export-overlay"><div className="export-box"><b>Exportando video MP4</b><div className="progress-track"><span style={{width:exportProgress+"%"}}/></div><span>{exportProgress}% · No cierres Play Studio</span></div></div>}
+    {exporting&&<div className="export-overlay"><div className="export-box"><b>Exportando video MP4</b><div className="progress-track"><span style={{width:exportProgress+"%"}}/></div><span>{exportProgress}% · No cierres Play Studio</span><button className="cancel-export" onClick={()=>void window.playStudio.cancelExport()}>Cancelar exportación</button></div></div>}
     {assistant&&<div className="assistant"><div className="assistant-head">✦ Asistente de Play Studio <button onClick={()=>setAssistant(false)}>×</button></div><p>Asistente de ayuda para las herramientas del editor. No aplica efectos ni modifica contenido con IA.</p><input value={assistantText} onChange={e=>setAssistantText(e.target.value)} placeholder="¿Cómo puedo dividir un clip?"/><button onClick={()=>setAssistantText("Selecciona el clip, coloca el cabezal donde quieras cortar y pulsa Dividir. También puedes usar la tecla S.")}>Cómo dividir un clip</button><button onClick={()=>setAssistantText("Arrastra el centro del clip para moverlo. Arrastra cualquiera de sus bordes para recortar su inicio o final.")}>Cómo mover o recortar</button><small>Ayuda local · Sin edición con IA</small></div>}
   </div>;
 }
