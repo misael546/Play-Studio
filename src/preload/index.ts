@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("playStudio", {
   getWaveform: (filePath: string, duration: number): Promise<number[]> => ipcRenderer.invoke("media:waveform", filePath, duration),
   saveProject: (data: string, saveAs = false): Promise<boolean> => ipcRenderer.invoke("project:save", data, saveAs),
   resetProjectPath: (): Promise<boolean> => ipcRenderer.invoke("project:reset-path"),
+  acceptLoadedProject: (): Promise<boolean> => ipcRenderer.invoke("project:accept-load"),
   loadProject: (): Promise<string | null> => ipcRenderer.invoke("project:load"),
   exportVideo: (request: ExportRequest): Promise<{ canceled: boolean; path?: string }> => ipcRenderer.invoke("export:render", request),
   cancelExport: (): Promise<boolean> => ipcRenderer.invoke("export:cancel"),
