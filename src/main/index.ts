@@ -10,6 +10,7 @@ let mainWindow: BrowserWindow | null = null;
 let exportProcess: ReturnType<typeof spawn> | null = null;
 let exportCanceled = false;
 let currentProjectPath: string | null = null;
+let pendingProjectPath: string | null = null;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -110,11 +111,12 @@ app.whenReady().then(() => {
     return true;
   });
   ipcMain.handle("project:reset-path", () => { currentProjectPath = null; return true; });
+  ipcMain.handle("project:accept-load", () => { if (pendingProjectPath) currentProjectPath = pendingProjectPath; pendingProjectPath = null; return true; });
   ipcMain.handle("project:load", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
     if (result.canceled || !result.filePaths[0]) return null;
     const data = await readFile(result.filePaths[0], "utf8");
-    currentProjectPath = result.filePaths[0];
+    pendingProjectPath = result.filePaths[0];
     return data;
   });
   ipcMain.handle("export:cancel", () => {
