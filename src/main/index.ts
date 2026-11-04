@@ -93,13 +93,13 @@ app.whenReady().then(() => {
     }
     args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
     return await new Promise((resolve, reject) => {
-      const child = spawn(ffmpegPath, args, { windowsHide: true });
+      const child = spawn(app.isPackaged ? ffmpegPath.replace("app.asar", "app.asar.unpacked") : ffmpegPath, args, { windowsHide: true });
       let errorText = "";
       child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 12000) errorText = errorText.slice(-12000); });
       child.stdout.on("data", chunk => {
-        const lines = chunk.toString().split(/\\r?\\n/);
+        const lines = chunk.toString().split(/\r?\n/);
         for (const line of lines) {
-          const match = line.match(/^out_time_ms=(\\d+)/);
+          const match = line.match(/^out_time_ms=(\d+)/);
           if (match && mainWindow && !mainWindow.isDestroyed()) {
             const seconds = Number(match[1]) / 1000000;
             event.sender.send("export:progress", Math.min(99, Math.round(seconds / totalDuration * 100)));
