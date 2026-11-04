@@ -8,7 +8,11 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Varias pistas de video y audio.
 - Selección, mover clips, recortar bordes, dividir, cortar, copiar, pegar y eliminar.
 - Cabezal de reproducción controlado con clic derecho en la línea de tiempo.
-- Propiedades de posición, duración y volumen de clips de audio.\n- Fundidos de entrada y salida de video y audio.\n- Texto superpuesto por clip, con posición y tamaño ajustables.\n- Ajustes de brillo, contraste y saturación.\n- Exportación con resolución 720p, 1080p o 4K y 24, 30 o 60 FPS.
+- Propiedades de posición, duración y volumen de clips de audio.
+- Fundidos de entrada y salida de video y audio.
+- Texto superpuesto por clip, con posición y tamaño ajustables.
+- Ajustes de brillo, contraste y saturación.
+- Exportación con resolución 720p, 1080p o 4K y 24, 30 o 60 FPS.
 - Guardar y abrir proyectos `.playstudio`.
 - Exportación MP4 mediante FFmpeg incluido, con progreso de exportación.
 
