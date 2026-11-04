@@ -202,7 +202,11 @@ function App() {
       else if((event.ctrlKey||event.metaKey)&&key==="x"){event.preventDefault();cut();}
       else if(key==="delete"||key==="backspace"){remove();}
       else if(key===" "){event.preventDefault();setPlaying(v=>!v);}
-      else if(key==="s"&&!event.ctrlKey){split();}
+      else if(key==="arrowleft"){event.preventDefault();setPlayhead(v=>Math.max(0,v-1/fps));}
+      else if(key==="arrowright"){event.preventDefault();setPlayhead(v=>Math.min(duration,v+1/fps));}
+      else if(key==="home"){event.preventDefault();setPlayhead(0);setPlaying(false);}
+      else if(key==="end"){event.preventDefault();setPlayhead(duration);setPlaying(false);}
+      else if(key==="s"&&!event.ctrlKey&&!event.metaKey){split();}
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   });
@@ -251,10 +255,10 @@ function App() {
         <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
       </div>
       <div className="timeline-scroll">
-        <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
+        <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
         {tracks.map(track=><div className="track-row" key={track.id}>
           <div className="track-label">{track.name}</div>
-          <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
+          <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
             {clips.filter(c=>c.track===track.id).map(c=><div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
               <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
               <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
