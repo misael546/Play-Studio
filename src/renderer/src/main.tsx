@@ -376,6 +376,7 @@ function App() {
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
+      if(importing||exporting)return;
       const target=event.target as HTMLElement;if(["INPUT","TEXTAREA","SELECT","BUTTON"].includes(target?.tagName)||target?.isContentEditable)return;
       const key=event.key.toLowerCase();
       if((event.ctrlKey||event.metaKey)&&event.shiftKey&&key==="z"){event.preventDefault();redo();}
