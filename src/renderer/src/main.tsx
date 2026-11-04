@@ -12,7 +12,8 @@ declare global {
       openMedia: () => Promise<MediaItem[]>;
       relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
-      saveProject: (data: string) => Promise<boolean>;
+      saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
+      resetProjectPath: () => Promise<boolean>;
       loadProject: () => Promise<string | null>;
       exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
       cancelExport: () => Promise<boolean>;
@@ -143,10 +144,11 @@ function App() {
     const count=tracks.filter(t=>t.kind===kind).length+1;
     setTracks(old=>[...old,{id:kind+"-"+count,name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
   };
-  const save = async () => {
+  const save = async (saveAs = false) => {
     try{
       const data={version:2,name:projectName,tracks,clips:clips.map(({url,...c})=>c),playhead};
-      await window.playStudio.saveProject(JSON.stringify(data,null,2));
+      const saved=await window.playStudio.saveProject(JSON.stringify(data,null,2),saveAs);
+      if(!saved)return;
     }catch(error){alert(error instanceof Error?"No se pudo guardar el proyecto: "+error.message:"No se pudo guardar el proyecto.");}
   };
   const load = async () => {
@@ -183,6 +185,7 @@ function App() {
   };
   const newProject = () => {
     if(clips.length&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
+    void window.playStudio.resetProjectPath();
     setProjectName("Proyecto sin título");
     setTracks([{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
     setClips([]);setSelected(null);setClipboard(null);setPlayhead(0);setPlaying(false);setUndoStack([]);setRedoStack([]);
@@ -350,7 +353,7 @@ function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO</b><small>EDITOR DE VIDEO</small></div></div>
-      <nav><button onClick={newProject}>Nuevo proyecto</button><button onClick={load}>Abrir proyecto</button><button onClick={save}>Guardar proyecto</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
+      <nav><button onClick={newProject}>Nuevo proyecto</button><button onClick={load}>Abrir proyecto</button><button onClick={()=>void save()}>Guardar</button><button onClick={()=>void save(true)}>Guardar como</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
       <button className="assistant-toggle" onClick={()=>setAssistant(!assistant)}>✦ Asistente</button>
     </header>
     <div className="menubar"><span>Archivo</span><span>Editar</span><span>Ver</span><span>Clip</span><span>Ayuda</span><input className="project-name" value={projectName} onChange={e=>setProjectName(e.target.value)} aria-label="Nombre del proyecto"/></div>
