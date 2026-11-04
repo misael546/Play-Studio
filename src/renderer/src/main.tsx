@@ -36,6 +36,14 @@ const fadeGain = (clip: Clip, elapsed: number) => {
   const fadeOutGain = clip.fadeOut > 0 ? remaining / clip.fadeOut : 1;
   return Math.max(0, Math.min(1, fadeInGain, fadeOutGain));
 };
+async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = await Promise.all(items.slice(index, index + batchSize).map(mapper));
+    results.push(...batch);
+  }
+  return results;
+}
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<Clip[][]>([]);
@@ -84,11 +92,11 @@ function App() {
     try{
     const items = await window.playStudio.openMedia();
     if (!items.length) return;
-    const prepared = await Promise.all(items.map(async item => {
+    const prepared = await mapInBatches(items,2,async item => {
       const mediaDuration=await readDuration(item);
       const waveform=item.kind==="audio"&&mediaDuration>0?await window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):undefined;
       return {...item,mediaDuration,waveform};
-    }));
+    });
     const valid = prepared.filter(item => item.mediaDuration > 0);
     const invalid = prepared.filter(item => item.mediaDuration <= 0);
     if(invalid.length)alert("No se pudo leer la duración de estos archivos y no se añadieron:\\n"+invalid.map(item=>item.name).join("\\n")+"\\nComprueba que el archivo no esté dañado y que Windows pueda reproducirlo.");
@@ -168,7 +176,7 @@ function App() {
       const rawClips=Array.isArray(p.clips)?p.clips:[];
       const validClips=rawClips.filter((clip:any)=>clip&&typeof clip.id==="string"&&typeof clip.name==="string"&&typeof clip.path==="string"&&(clip.kind==="video"||clip.kind==="audio")&&Number.isFinite(clip.start)&&clip.start>=0&&Number.isFinite(clip.duration)&&clip.duration>0&&Number.isFinite(clip.sourceStart)&&clip.sourceStart>=0);
       if(validClips.length!==rawClips.length)alert("Se omitieron clips dañados o incompletos al abrir el proyecto.");
-      const normalizedClips=await Promise.all(validClips.map(async (clip:any)=>{
+      const normalizedClips=await mapInBatches(validClips,2,async (clip:any)=>{
         const sourceDuration=Math.max(0.1,Number.isFinite(clip.sourceDuration)&&clip.sourceDuration>0?clip.sourceDuration:clip.sourceStart+clip.duration);
         const sourceStart=Math.max(0,Math.min(sourceDuration-0.1,clip.sourceStart));
         const clipDuration=Math.max(0.1,Math.min(clip.duration,sourceDuration-sourceStart));
@@ -177,7 +185,7 @@ function App() {
         const savedWaveform=Array.isArray(clip.waveform)?clip.waveform.filter((peak:any)=>Number.isFinite(peak)).slice(0,180).map((peak:number)=>Math.max(0,Math.min(1,peak))):[];
         const waveform=savedWaveform.length?savedWaveform:clip.kind==="audio"?await window.playStudio.getWaveform(clip.path,sourceDuration).catch(()=>[]):undefined;
         return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",url:makeMediaUrl(clip.path)} as Clip;
-      }));
+      });
       setProjectName(importedProjectName);
       setTracks(normalizedTracks);
       setClips(normalizedClips);
