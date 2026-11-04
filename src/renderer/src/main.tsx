@@ -25,9 +25,21 @@ declare global {
 const makeMediaUrl = (path: string) => "media://local/" + btoa(unescape(encodeURIComponent(path))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const readDuration = (item: MediaItem) => new Promise<number>(resolve => {
   const element = document.createElement(item.kind === "audio" ? "audio" : "video");
+  let settled = false;
+  const finish = (duration: number) => {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timeout);
+    element.onloadedmetadata = null;
+    element.onerror = null;
+    element.removeAttribute("src");
+    element.load();
+    resolve(duration);
+  };
+  const timeout = window.setTimeout(() => finish(0), 20000);
   element.preload = "metadata";
-  element.onloadedmetadata = () => resolve(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0);
-  element.onerror = () => resolve(0);
+  element.onloadedmetadata = () => finish(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0);
+  element.onerror = () => finish(0);
   element.src = item.url;
 });
 const fadeGain = (clip: Clip, elapsed: number) => {
