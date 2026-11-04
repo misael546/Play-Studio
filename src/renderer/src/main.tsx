@@ -46,7 +46,8 @@ function App() {
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
   const dragRef = useRef<DragState | null>(null);
   const active = clips.find(c => c.id === selected);
-  const duration = Math.max(30, ...clips.map(c => c.start + c.duration));
+  const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
+  const duration = Math.max(30, contentDuration);
   const pixelsPerSecond = 48 * zoom;
   const previewClip = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>b.start-a.start)[0] ?? (!playing && active?.kind === "video" ? active : undefined);
   const selectedTrack = tracks.find(t => t.id === active?.track);
@@ -128,6 +129,7 @@ function App() {
     finally { stop();setExporting(false);setExportProgress(0); }
   };
   const time=(seconds:number)=>{const s=Math.max(0,Math.floor(seconds));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
+  const togglePlayback=()=>{if(playing){setPlaying(false);return;}if(contentDuration<=0)return;if(playhead>=contentDuration)setPlayhead(0);setPlaying(true);};
 
   useEffect(()=>{
     const onMove=(event:PointerEvent)=>{
@@ -205,11 +207,11 @@ function App() {
     if(!playing)return;
     const timer=window.setInterval(()=>setPlayhead(old=>{
       const next=old+0.05;
-      if(next>=duration){setPlaying(false);return duration;}
+      if(next>=contentDuration){setPlaying(false);return contentDuration;}
       return next;
     }),50);
     return()=>window.clearInterval(timer);
-  },[playing,duration]);
+  },[playing,contentDuration]);
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
@@ -223,11 +225,11 @@ function App() {
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
       else if((event.ctrlKey||event.metaKey)&&key==="x"){event.preventDefault();cut();}
       else if(key==="delete"||key==="backspace"){remove();}
-      else if(key===" "){event.preventDefault();setPlaying(v=>!v);}
+      else if(key===" "){event.preventDefault();togglePlayback();}
       else if(key==="arrowleft"){event.preventDefault();setPlayhead(v=>Math.max(0,v-1/fps));}
       else if(key==="arrowright"){event.preventDefault();setPlayhead(v=>Math.min(duration,v+1/fps));}
       else if(key==="home"){event.preventDefault();setPlayhead(0);setPlaying(false);}
-      else if(key==="end"){event.preventDefault();setPlayhead(duration);setPlaying(false);}
+      else if(key==="end"){event.preventDefault();setPlayhead(contentDuration);setPlaying(false);}
       else if(key==="s"&&!event.ctrlKey&&!event.metaKey){split();}
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
@@ -250,7 +252,7 @@ function App() {
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
         <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
-        <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={()=>setPlaying(v=>!v)}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>setPlayhead(duration)}>⏭</button><span>{time(playhead)} / {time(duration)}</span></div>
+        <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
         <div className="panel-heading"><b>PROPIEDADES</b></div>
