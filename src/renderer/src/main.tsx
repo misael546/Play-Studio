@@ -141,11 +141,15 @@ function App() {
         let movedStart=Math.max(0,drag.clip.start+delta);
         if(drag.mode==="move"){
           const snapPoints=[playhead,...others.flatMap(c=>[c.start,c.start+c.duration])];
-          let bestDifference=8/pixelsPerSecond;
+          let bestDifference=0;
+          let bestDistance=8/pixelsPerSecond;
           for(const point of snapPoints){
             for(const edge of [movedStart,movedStart+drag.clip.duration]){
               const difference=point-edge;
-              if(Math.abs(difference)<Math.abs(bestDifference))bestDifference=difference;
+              if(Math.abs(difference)<bestDistance){
+                bestDifference=difference;
+                bestDistance=Math.abs(difference);
+              }
             }
           }
           movedStart=Math.max(0,movedStart+bestDifference);
