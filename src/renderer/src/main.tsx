@@ -106,7 +106,7 @@ function App() {
       setProjectName(p.name??"Proyecto importado");
       setTracks(p.tracks?.length?p.tracks:[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
       setClips((p.clips??[]).map((clip:Omit<Clip,"url">)=>({...clip,url:makeMediaUrl(clip.path)})));
-      setPlayhead(p.playhead??0);setSelected(null);setPlaying(false);
+      setPlayhead(p.playhead??0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
     } catch { alert("El archivo de proyecto no es válido."); }
   };
   const exportVideo = async () => {
@@ -222,7 +222,7 @@ function App() {
           <div className="track-label">{track.name}</div>
           <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
             {clips.filter(c=>c.track===track.id).map(c=><div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
-              <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
+              <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
               <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
               <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
               <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
