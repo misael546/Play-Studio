@@ -9,7 +9,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard:
 let mainWindow: BrowserWindow | null = null;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
-const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/'/g,"\\\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\\[/g,"\\\\[").replace(/\\]/g,"\\\\]");
+const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1500, height: 920, minWidth: 1050, minHeight: 680,
@@ -53,7 +53,8 @@ app.whenReady().then(() => {
     if (result.canceled || !result.filePaths[0]) return null;
     return readFile(result.filePaths[0], "utf8");
   });
-  ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {\n    const clips = request.clips;
+  ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {
+    const clips = request.clips;
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
     if (!Array.isArray(clips) || clips.length === 0) throw new Error("Agrega al menos un clip a la línea de tiempo.");
@@ -67,8 +68,11 @@ app.whenReady().then(() => {
     const totalDuration = Math.max(...safeClips.map(c => c.start + c.duration));
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath) return { canceled: true };
-    const videos = safeClips.filter(c => c.kind === "video");
+    const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>a.start-b.start);
     const audios = safeClips.filter(c => c.kind === "audio");
+    const dimensions:Record<string,[number,number]> = {"720p":[1280,720],"1080p":[1920,1080],"4k":[3840,2160]};
+    const [width,height] = dimensions[request.resolution ?? "1080p"] ?? dimensions["1080p"];
+    const fps = [24,30,60].includes(request.fps ?? 30) ? (request.fps ?? 30) : 30;
     const args: string[] = ["-y"];
     safeClips.forEach(c => args.push("-i", c.path));
     const filters: string[] = [];
@@ -87,7 +91,7 @@ app.whenReady().then(() => {
         const y=clip.titlePosition==="top"?"60":clip.titlePosition==="center"?"(h-text_h)/2":"h-text_h-60";
         const title=escapeFilterText(clip.title.trim());
         const size=Math.max(12,Math.min(160,clip.titleSize??48));
-        videoFilters.push("drawtext=fontfile='C\\\\:/Windows/Fonts/segoeui.ttf':text='"+title+"':fontcolor=white:fontsize="+size+":x=(w-text_w)/2:y="+y+":box=1:boxcolor=black@0.45:boxborderw=12");
+        videoFilters.push("drawtext=fontfile='C:/Windows/Fonts/segoeui.ttf':text='"+title+"':fontcolor=white:fontsize="+size+":x=(w-text_w)/2:y="+y+":box=1:boxcolor=black@0.45:boxborderw=12");
       }
       videoFilters.push("setpts=PTS+"+clip.start.toFixed(3)+"/TB");
       filters.push("["+inputIndex+":v:0]"+videoFilters.join(",")+"["+label+"]");
