@@ -8,11 +8,13 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "ffmpeg-static": "^5.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
@@ -22,7 +24,8 @@
     "electron": "^36.4.0",
     "electron-vite": "^3.1.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "com.playstudio.editor",
@@ -30,10 +33,26 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "artifactName": "Play-Studio-Setup-${version}.${ext}"
     },
     "directories": {
       "output": "release"
+    },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
+    "files": [
+      "dist-electron/**",
+      "dist/**",
+      "node_modules/**",
+      "package.json"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
