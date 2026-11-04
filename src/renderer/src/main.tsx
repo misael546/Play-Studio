@@ -48,7 +48,7 @@ function App() {
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
   const [fps,setFps] = useState<24|30|60>(30);
   const [projectName, setProjectName] = useState("Proyecto sin título");
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRefs = useRef<Record<string,HTMLVideoElement|null>>({});
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
   const playbackFrameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -56,7 +56,9 @@ function App() {
   const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
   const duration = Math.max(30, contentDuration);
   const pixelsPerSecond = 48 * zoom;
-  const previewClip = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>b.start-a.start)[0] ?? (!playing && active?.kind === "video" ? active : undefined);
+  const previewClips = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>tracks.findIndex(t=>t.id===a.track)-tracks.findIndex(t=>t.id===b.track)||a.start-b.start);
+  const previewLayers = previewClips.length ? previewClips : (!playing && active?.kind === "video" ? [active] : []);
+  const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
   const commitClips = (update: Clip[] | ((old:Clip[])=>Clip[])) => {
     const next = typeof update === "function" ? update(clips) : update;
@@ -185,24 +187,29 @@ function App() {
   },[pixelsPerSecond,tracks,playhead]);
 
   useEffect(()=>{
-    const video=videoRef.current;
-    if(video&&previewClip){
-      const elapsed=Math.max(0,playhead-previewClip.start);
-      video.volume=Math.min(1,Math.max(0,previewClip.volume*fadeGain(previewClip,elapsed)));
+    for(const clip of previewLayers){
+      const video=videoRefs.current[clip.id];if(!video)continue;
+      const elapsed=Math.max(0,playhead-clip.start);
+      video.volume=Math.min(1,Math.max(0,clip.volume*fadeGain(clip,elapsed)));
     }
-  },[previewClip?.id,previewClip?.volume,previewClip?.fadeIn,previewClip?.fadeOut,playhead]);
+  },[previewLayers,playhead]);
 
   useEffect(()=>{
-    const video=videoRef.current;if(!video||!previewClip||playing)return;
-    const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));
-    if(Math.abs(video.currentTime-wanted)>0.18) { try{video.currentTime=wanted;}catch{} }
-  },[previewClip?.id,playhead,previewClip?.sourceStart,previewClip?.start,previewClip?.duration,playing]);
+    if(playing)return;
+    for(const clip of previewLayers){
+      const video=videoRefs.current[clip.id];if(!video)continue;
+      const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));
+      if(Math.abs(video.currentTime-wanted)>0.18){try{video.currentTime=wanted;}catch{}}
+    }
+  },[previewLayers,playhead,playing]);
 
   useEffect(()=>{
-    const video=videoRef.current;if(!video)return;
-    if(playing&&previewClip)void video.play().catch(()=>setPlaying(false));
-    else video.pause();
-  },[playing,previewClip?.id]);
+    for(const clip of previewLayers){
+      const video=videoRefs.current[clip.id];if(!video)continue;
+      if(playing)void video.play().catch(()=>setPlaying(false));
+      else video.pause();
+    }
+  },[playing,previewLayers]);
 
   useEffect(()=>{
     for(const clip of clips.filter(c=>c.kind==="audio")){
@@ -279,7 +286,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`,opacity:fadeGain(previewClip,Math.max(0,playhead-previewClip.start))}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,opacity:fadeGain(clip,Math.max(0,playhead-clip.start)),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onLoadedMetadata={e=>{const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}</div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
