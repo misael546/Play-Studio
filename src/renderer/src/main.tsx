@@ -57,6 +57,7 @@ function App() {
   const [assistantText, setAssistantText] = useState("");
   const [zoom, setZoom] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
   const [fps,setFps] = useState<24|30|60>(30);
@@ -89,34 +90,42 @@ function App() {
   };
 
   const addMedia = async () => {
-    try{
-    const items = await window.playStudio.openMedia();
-    if (!items.length) return;
-    const prepared = await mapInBatches(items,2,async item => {
-      const mediaDuration=await readDuration(item);
-      const waveform=item.kind==="audio"&&mediaDuration>0?await window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):undefined;
-      return {...item,mediaDuration,waveform};
-    });
-    const valid = prepared.filter(item => item.mediaDuration > 0);
-    const invalid = prepared.filter(item => item.mediaDuration <= 0);
-    if(invalid.length)alert("No se pudo leer la duración de estos archivos y no se añadieron:\\n"+invalid.map(item=>item.name).join("\\n")+"\\nComprueba que el archivo no esté dañado y que Windows pueda reproducirlo.");
-    if(!valid.length)return;
-    commitClips(old => {
-      const next = [...old];
-      const cursors: Record<"video"|"audio",number> = {
-        video: Math.max(0, ...next.filter(c=>c.kind==="video").map(c=>c.start+c.duration)),
-        audio: Math.max(0, ...next.filter(c=>c.kind==="audio").map(c=>c.start+c.duration))
-      };
-      for (const item of valid) {
-        const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
-        const {mediaDuration, ...media} = item;
-        const clip: Clip = {...media, start: cursors[item.kind], duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
-        next.push(clip);
-        cursors[item.kind] += item.mediaDuration;
+    try {
+      const items = await window.playStudio.openMedia();
+      if (!items.length) return;
+      setImporting(true);
+      try {
+        const prepared = await mapInBatches(items,2,async item => {
+          const mediaDuration=await readDuration(item);
+          const waveform=item.kind==="audio"&&mediaDuration>0?await window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):undefined;
+          return {...item,mediaDuration,waveform};
+        });
+        const valid = prepared.filter(item => item.mediaDuration > 0);
+        const invalid = prepared.filter(item => item.mediaDuration <= 0);
+        if(invalid.length)alert("No se pudo leer la duración de estos archivos y no se añadieron:\\n"+invalid.map(item=>item.name).join("\\n")+"\\nComprueba que el archivo no esté dañado y que Windows pueda reproducirlo.");
+        if(!valid.length)return;
+        commitClips(old => {
+          const next = [...old];
+          const cursors: Record<"video"|"audio",number> = {
+            video: Math.max(0, ...next.filter(c=>c.kind==="video").map(c=>c.start+c.duration)),
+            audio: Math.max(0, ...next.filter(c=>c.kind==="audio").map(c=>c.start+c.duration))
+          };
+          for (const item of valid) {
+            const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
+            const {mediaDuration, ...media} = item;
+            const clip: Clip = {...media, start: cursors[item.kind], duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
+            next.push(clip);
+            cursors[item.kind] += item.mediaDuration;
+          }
+          return next;
+        });
+      } finally {
+        setImporting(false);
       }
-      return next;
-    });
-    }catch(error){alert(error instanceof Error?"No se pudieron importar los medios: "+error.message:"No se pudieron importar los medios.");}
+    } catch(error) {
+      setImporting(false);
+      alert(error instanceof Error?"No se pudieron importar los medios: "+error.message:"No se pudieron importar los medios.");
+    }
   };
   const relinkSelected = async () => {
     if(!active)return;
@@ -429,6 +438,7 @@ function App() {
       <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
     <div className="audio-players" aria-hidden="true">{clips.filter(c=>c.kind==="audio").map(c=><audio key={c.id} ref={element=>{audioRefs.current[c.id]=element;}} src={c.url} preload="auto"/>)}</div>
+    {importing&&<div className="import-overlay"><div className="import-box"><b>Preparando medios…</b><span>Analizando archivos y generando formas de onda</span></div></div>}
     {exporting&&<div className="export-overlay"><div className="export-box"><b>Exportando video MP4</b><div className="progress-track"><span style={{width:exportProgress+"%"}}/></div><span>{exportProgress}% · No cierres Play Studio</span><button className="cancel-export" onClick={()=>void window.playStudio.cancelExport()}>Cancelar exportación</button></div></div>}
     {assistant&&<div className="assistant"><div className="assistant-head">✦ Asistente de Play Studio <button onClick={()=>setAssistant(false)}>×</button></div><p>Asistente de ayuda para las herramientas del editor. No aplica efectos ni modifica contenido con IA.</p><input value={assistantText} onChange={e=>setAssistantText(e.target.value)} placeholder="¿Cómo puedo dividir un clip?"/><button onClick={()=>setAssistantText("Selecciona el clip, coloca el cabezal donde quieras cortar y pulsa Dividir. También puedes usar la tecla S.")}>Cómo dividir un clip</button><button onClick={()=>setAssistantText("Arrastra el centro del clip para moverlo. Arrastra cualquiera de sus bordes para recortar su inicio o final.")}>Cómo mover o recortar</button><small>Ayuda local · Sin edición con IA</small></div>}
   </div>;
