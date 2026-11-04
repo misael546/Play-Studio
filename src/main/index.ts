@@ -7,6 +7,8 @@ import ffmpegPath from "ffmpeg-static";
 
 protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard: true, supportFetchAPI: true, stream: true, secure: true } }]);
 let mainWindow: BrowserWindow | null = null;
+let exportProcess: ReturnType<typeof spawn> | null = null;
+let exportCanceled = false;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
@@ -52,6 +54,12 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
     if (result.canceled || !result.filePaths[0]) return null;
     return readFile(result.filePaths[0], "utf8");
+  });
+  ipcMain.handle("export:cancel", () => {
+    if (!exportProcess) return false;
+    exportCanceled = true;
+    exportProcess.kill();
+    return true;
   });
   ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {
     const clips = request.clips;
@@ -133,6 +141,8 @@ app.whenReady().then(() => {
     const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     return await new Promise((resolve, reject) => {
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+      exportProcess = child;
+      exportCanceled = false;
       let errorText = "";
       child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 12000) errorText = errorText.slice(-12000); });
       child.stdout.on("data", chunk => {
@@ -145,10 +155,19 @@ app.whenReady().then(() => {
           }
         }
       });
-      child.on("error", reject);
+      child.on("error", error => {
+        exportProcess = null;
+        reject(error);
+      });
       child.on("close", code => {
-        if (code === 0) { event.sender.send("export:progress", 100); resolve({ canceled: false, path: target.filePath }); }
-        else reject(new Error("FFmpeg no pudo completar la exportación. " + errorText.slice(-1800)));
+        exportProcess = null;
+        if (exportCanceled) {
+          exportCanceled = false;
+          resolve({ canceled: true });
+        } else if (code === 0) {
+          event.sender.send("export:progress", 100);
+          resolve({ canceled: false, path: target.filePath });
+        } else reject(new Error("FFmpeg no pudo completar la exportación. " + errorText.slice(-1800)));
       });
     });
   });
