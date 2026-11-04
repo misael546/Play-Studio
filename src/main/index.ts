@@ -81,6 +81,7 @@ app.whenReady().then(() => {
     }
     if (!safeClips.length) throw new Error("No hay clips válidos para exportar.");
     const totalDuration = Math.max(...safeClips.map(c => c.start + c.duration));
+    if (exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath || exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
