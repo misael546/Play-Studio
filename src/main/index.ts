@@ -9,7 +9,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard:
 let mainWindow: BrowserWindow | null = null;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
-const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
+const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1500, height: 920, minWidth: 1050, minHeight: 680,
@@ -61,7 +61,13 @@ app.whenReady().then(() => {
     const safeClips: ExportClip[] = [];
     for (const clip of clips) {
       if (!clip.path || !Number.isFinite(clip.start) || !Number.isFinite(clip.sourceStart) || !Number.isFinite(clip.duration) || clip.duration <= 0 || clip.start < 0 || clip.sourceStart < 0) continue;
-      await stat(clip.path);
+      try {
+        const fileInfo = await stat(clip.path);
+        if (!fileInfo.isFile()) throw new Error("La ruta no corresponde a un archivo.");
+      } catch {
+        const missingName = clip.path.split(/[\\/]/).pop() ?? clip.path;
+        throw new Error("No se encuentra el archivo de medio: " + missingName + ". Vuelve a importarlo desde su ubicación original.");
+      }
       safeClips.push(clip);
     }
     if (!safeClips.length) throw new Error("No hay clips válidos para exportar.");
