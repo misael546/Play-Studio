@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("playStudio", {
   saveProject: (data: string): Promise<boolean> => ipcRenderer.invoke("project:save", data),
   loadProject: (): Promise<string | null> => ipcRenderer.invoke("project:load"),
   exportVideo: (request: ExportRequest): Promise<{ canceled: boolean; path?: string }> => ipcRenderer.invoke("export:render", request),
+  cancelExport: (): Promise<boolean> => ipcRenderer.invoke("export:cancel"),
   onExportProgress: (callback: (progress: number) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: number) => callback(progress);
     ipcRenderer.on("export:progress", listener);
