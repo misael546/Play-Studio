@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { MediaItem, ExportClip } from "../../preload";
+import type { MediaItem, ExportClip, ExportRequest } from "../../preload";
 import "./style.css";
 
 type Track = { id: string; name: string; kind: "video" | "audio" };
-type Clip = MediaItem & { start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number };
+type Clip = MediaItem & { start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
 declare global {
   interface Window {
@@ -12,7 +12,7 @@ declare global {
       openMedia: () => Promise<MediaItem[]>;
       saveProject: (data: string) => Promise<boolean>;
       loadProject: () => Promise<string | null>;
-      exportVideo: (clips: ExportClip[]) => Promise<{ canceled: boolean; path?: string }>;
+      exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
       onExportProgress: (callback: (progress: number) => void) => () => void;
     };
   }
@@ -38,7 +38,7 @@ function App() {
   const [assistantText, setAssistantText] = useState("");
   const [zoom, setZoom] = useState(1);
   const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
+  const [exportProgress, setExportProgress] = useState(0);\n  const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");\n  const [fps,setFps] = useState<24|30|60>(30);
   const [projectName, setProjectName] = useState("Proyecto sin título");
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
@@ -71,7 +71,7 @@ function App() {
       for (const item of prepared) {
         const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
         const {mediaDuration, ...media} = item;
-        const clip: Clip = {...media, start: cursor, duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1};
+        const clip: Clip = {...media, start: cursor, duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
         next.push(clip);
         cursor += item.mediaDuration;
       }
@@ -106,7 +106,7 @@ function App() {
       const p=JSON.parse(data);
       setProjectName(p.name??"Proyecto importado");
       setTracks(p.tracks?.length?p.tracks:[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
-      setClips((p.clips??[]).map((clip:Omit<Clip,"url">)=>({...clip,url:makeMediaUrl(clip.path)})));
+      setClips((p.clips??[]).map((clip:any)=>({...clip,fadeIn:clip.fadeIn??0,fadeOut:clip.fadeOut??0,brightness:clip.brightness??0,contrast:clip.contrast??1,saturation:clip.saturation??1,title:clip.title??"",titleSize:clip.titleSize??48,titlePosition:clip.titlePosition??"bottom",url:makeMediaUrl(clip.path)} as Clip)));
       setPlayhead(p.playhead??0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
     } catch { alert("El archivo de proyecto no es válido."); }
   };
@@ -116,7 +116,7 @@ function App() {
     const stop=window.playStudio.onExportProgress(setExportProgress);
     try {
       const payload:ExportClip[]=clips.map(c=>({path:c.path,kind:c.kind,start:c.start,sourceStart:c.sourceStart,duration:c.duration,volume:c.volume}));
-      const result=await window.playStudio.exportVideo(payload);
+      const request:ExportRequest={clips:payload,resolution,fps};\n      const result=await window.playStudio.exportVideo(request);
       if(!result.canceled) alert("Exportación terminada.\n"+result.path);
     } catch(error) { alert(error instanceof Error?error.message:"No se pudo exportar el video."); }
     finally { stop();setExporting(false);setExportProgress(0); }
@@ -202,7 +202,7 @@ function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO</b><small>EDITOR DE VIDEO</small></div></div>
-      <nav><button onClick={load}>Abrir proyecto</button><button onClick={save}>Guardar proyecto</button><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
+      <nav><button onClick={load}>Abrir proyecto</button><button onClick={save}>Guardar proyecto</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
       <button className="assistant-toggle" onClick={()=>setAssistant(!assistant)}>✦ Asistente</button>
     </header>
     <div className="menubar"><span>Archivo</span><span>Editar</span><span>Ver</span><span>Clip</span><span>Ayuda</span><input className="project-name" value={projectName} onChange={e=>setProjectName(e.target.value)} aria-label="Nombre del proyecto"/></div>
@@ -223,6 +223,16 @@ function App() {
         {active?<><div className="property-title">{active.name}</div><label>Tipo <span>{active.kind==="video"?"Video":"Audio"}</span></label><label>Pista <span>{selectedTrack?.name??active.track}</span></label>
           <label>Inicio (s)<input type="number" min="0" step="0.1" value={active.start.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,start:Math.max(0,Number(e.target.value)||0)}:c))}/></label>
           <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration,Number(e.target.value)||.1))}:c))}/></label>
+          <label>Fundido entrada (s)<input type="number" min="0" step=".1" max={active.duration} value={active.fadeIn} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,fadeIn:Math.max(0,Math.min(active.duration,Number(e.target.value)||0))}:c))}/></label>
+          <label>Fundido salida (s)<input type="number" min="0" step=".1" max={active.duration} value={active.fadeOut} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,fadeOut:Math.max(0,Math.min(active.duration,Number(e.target.value)||0))}:c))}/></label>
+          {active.kind==="video"&&<>
+            <label className="stacked-property">Texto en pantalla<input type="text" maxLength={120} value={active.title} placeholder="Escribe un título..." onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,title:e.target.value}:c))}/></label>
+            <label>Posición del texto<select value={active.titlePosition} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,titlePosition:e.target.value as Clip["titlePosition"]}:c))}><option value="top">Arriba</option><option value="center">Centro</option><option value="bottom">Abajo</option></select></label>
+            <label>Tamaño del texto<input type="number" min="12" max="160" value={active.titleSize} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,titleSize:Math.max(12,Math.min(160,Number(e.target.value)||48))}:c))}/></label>
+            <label className="volume-property">Brillo <input type="range" min="-.5" max=".5" step=".05" value={active.brightness} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,brightness:Number(e.target.value)}:c))}/><span>{active.brightness.toFixed(2)}</span></label>
+            <label className="volume-property">Contraste <input type="range" min=".5" max="2" step=".05" value={active.contrast} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,contrast:Number(e.target.value)}:c))}/><span>{active.contrast.toFixed(2)}</span></label>
+            <label className="volume-property">Saturación <input type="range" min="0" max="2" step=".05" value={active.saturation} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,saturation:Number(e.target.value)}:c))}/><span>{active.saturation.toFixed(2)}</span></label>
+          </>}
           {active.kind==="audio"&&<label className="volume-property">Volumen <input type="range" min="0" max="2" step=".05" value={active.volume} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,volume:Number(e.target.value)}:c))}/><span>{Math.round(active.volume*100)}%</span></label>}
           <button className="danger-button" onClick={remove}>Eliminar clip</button>
         </>:<div className="inspector-empty">Selecciona un clip para ajustar sus propiedades.</div>}
