@@ -10,6 +10,7 @@ declare global {
   interface Window {
     playStudio: {
       openMedia: () => Promise<MediaItem[]>;
+      relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
       saveProject: (data: string) => Promise<boolean>;
       loadProject: () => Promise<string | null>;
       exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
@@ -100,6 +101,23 @@ function App() {
       return next;
     });
     }catch(error){alert(error instanceof Error?"No se pudieron importar los medios: "+error.message:"No se pudieron importar los medios.");}
+  };
+  const relinkSelected = async () => {
+    if(!active)return;
+    try{
+      const replacement=await window.playStudio.relinkMedia(active.kind);
+      if(!replacement)return;
+      const mediaDuration=await readDuration(replacement);
+      if(!Number.isFinite(mediaDuration)||mediaDuration<=0.1){
+        alert("No se pudo leer la duración del archivo seleccionado.");
+        return;
+      }
+      commitClips(old=>old.map(clip=>{
+        if(clip.id!==active.id)return clip;
+        const sourceStart=Math.min(clip.sourceStart,mediaDuration-0.1);
+        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart))};
+      }));
+    }catch(error){alert(error instanceof Error?"No se pudo reemplazar el medio: "+error.message:"No se pudo reemplazar el medio.");}
   };
   const split = () => {
     if (!active || playhead <= active.start + 0.02 || playhead >= active.start + active.duration - 0.02) return;
@@ -332,7 +350,7 @@ function App() {
       </section>
       <aside className="inspector">
         <div className="panel-heading"><b>PROPIEDADES</b></div>
-        {active?<><div className="property-title">{active.name}</div><label>Tipo <span>{active.kind==="video"?"Video":"Audio"}</span></label><label>Pista <span>{selectedTrack?.name??active.track}</span></label>
+        {active?<><div className="property-title">{active.name}</div><button className="relink-button" onClick={()=>void relinkSelected()}>Reemplazar / localizar archivo</button><label>Tipo <span>{active.kind==="video"?"Video":"Audio"}</span></label><label>Pista <span>{selectedTrack?.name??active.track}</span></label>
           <label>Inicio (s)<input type="number" min="0" step="0.1" value={active.start.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,start:Math.max(0,Number(e.target.value)||0)}:c))}/></label>
           <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration-active.sourceStart,Number(e.target.value)||.1))}:c))}/></label>
           <label>Fundido entrada (s)<input type="number" min="0" step=".1" max={active.duration} value={active.fadeIn} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,fadeIn:Math.max(0,Math.min(active.duration,Number(e.target.value)||0))}:c))}/></label>
