@@ -135,7 +135,7 @@ function App() {
       const validClips=rawClips.filter((clip:any)=>clip&&typeof clip.id==="string"&&typeof clip.name==="string"&&typeof clip.path==="string"&&(clip.kind==="video"||clip.kind==="audio")&&Number.isFinite(clip.start)&&clip.start>=0&&Number.isFinite(clip.duration)&&clip.duration>0&&Number.isFinite(clip.sourceStart)&&clip.sourceStart>=0);
       if(validClips.length!==rawClips.length)alert("Se omitieron clips dañados o incompletos al abrir el proyecto.");
       setClips(validClips.map((clip:any)=>{
-        const sourceDuration=Number.isFinite(clip.sourceDuration)&&clip.sourceDuration>0?clip.sourceDuration:clip.sourceStart+clip.duration;
+        const sourceDuration=Math.max(0.1,Number.isFinite(clip.sourceDuration)&&clip.sourceDuration>0?clip.sourceDuration:clip.sourceStart+clip.duration);
         const sourceStart=Math.max(0,Math.min(sourceDuration-0.1,clip.sourceStart));
         const clipDuration=Math.max(0.1,Math.min(clip.duration,sourceDuration-sourceStart));
         const fallbackTrack=normalizedTracks.find(t=>t.kind===clip.kind)?.id??normalizedTracks[0].id;
