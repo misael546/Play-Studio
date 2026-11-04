@@ -383,6 +383,7 @@ function App() {
       else if((event.ctrlKey||event.metaKey)&&key==="o"){event.preventDefault();void load();}
       else if((event.ctrlKey||event.metaKey)&&event.shiftKey&&key==="s"){event.preventDefault();void save(true);}
       else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
+      else if((event.ctrlKey||event.metaKey)&&key==="0"){event.preventDefault();fitTimeline();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
       else if((event.ctrlKey||event.metaKey)&&key==="x"){event.preventDefault();cut();}
