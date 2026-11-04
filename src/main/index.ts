@@ -179,6 +179,7 @@ app.whenReady().then(() => {
       probe.on("error", () => resolve(false));
       probe.on("close", () => resolve(/Stream #\d+:\d+.*Audio:/s.test(probeText)));
     })));
+    if (exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const audioSources = [...separateAudios, ...videos.filter((_clip, index) => videoAudioFlags[index])];
     const dimensions:Record<string,[number,number]> = {"720p":[1280,720],"1080p":[1920,1080],"4k":[3840,2160]};
     const [width,height] = dimensions[request.resolution ?? "1080p"] ?? dimensions["1080p"];
