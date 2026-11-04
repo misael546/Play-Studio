@@ -1,25 +1,35 @@
 # Play Studio
 
-Editor de video de escritorio para Windows, con interfaz tradicional y asistente básico (sin funciones de edición con IA).
+Editor de video de escritorio para Windows. Interfaz tradicional, edición por línea de tiempo y un asistente pequeño de ayuda; no usa IA para editar ni generar contenido.
 
-## Objetivo
-- Importar video y audio desde el explorador de archivos de Windows.
-- Línea de tiempo multipista con selección, división y organización de clips.
-- Vista previa y controles de reproducción.
-- Guardado de proyectos editables.
-- Exportación mediante un motor FFmpeg que se integrará en la siguiente fase.
+## Funciones implementadas en esta base
+- Importar video y audio desde el explorador de Windows.
+- Lectura de duración de medios y biblioteca del proyecto.
+- Varias pistas de video y audio.
+- Selección, mover clips, recortar bordes, dividir, cortar, copiar, pegar y eliminar.
+- Cabezal de reproducción controlado con clic derecho en la línea de tiempo.
+- Propiedades de posición, duración y volumen de clips de audio.
+- Guardar y abrir proyectos `.playstudio`.
+- Exportación MP4 mediante FFmpeg incluido, con progreso de exportación.
 
-## Desarrollo
-Requisitos: Node.js LTS y npm.
+## Formatos de entrada
+MP4, MOV, MKV, AVI, WebM, M4V, MP3, WAV, AAC, M4A, FLAC, OGG y WMA. La compatibilidad final depende de los códecs incluidos en FFmpeg.
 
+## Requisitos de desarrollo
+- Windows 10/11 de 64 bits
+- Node.js LTS y npm
+
+## Ejecutar en desarrollo
 ```bash
 npm install
 npm run dev
 ```
 
-## Crear instalador de Windows
+## Crear instalador
 ```bash
-npm run build
+npm run dist
 ```
+El instalador NSIS se genera en la carpeta `release`.
 
-El instalador de Windows se configurará en la fase de empaquetado. Esta primera base es el esqueleto funcional de la interfaz y edición inicial; la exportación y operaciones avanzadas siguen pendientes.
+## Nota técnica
+Esta versión ya incluye el primer motor de exportación MP4. La previsualización multipista sincronizada, audio original incrustado en los clips de video, transiciones, títulos, efectos y mezcla avanzada siguen siendo etapas pendientes de desarrollo y pruebas.
