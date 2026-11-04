@@ -125,7 +125,7 @@ app.whenReady().then(() => {
         audioFilters.push("adelay="+delay+"|"+delay);
         filters.push("["+inputIndex+":a:0]"+audioFilters.join(",")+"[a"+index+"]");
       });
-      filters.push(audioSources.map((_,i)=>"[a"+i+"]").join("") + "amix=inputs=" + audioSources.length + ":duration=longest:dropout_transition=0,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
+      filters.push(audioSources.map((_,i)=>"[a"+i+"]").join("") + "amix=inputs=" + audioSources.length + ":duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95:attack=5:release=50,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     } else {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
