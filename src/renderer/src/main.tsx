@@ -27,6 +27,8 @@ const readDuration = (item: MediaItem) => new Promise<number>(resolve => {
 });
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
+  const [undoStack, setUndoStack] = useState<Clip[][]>([]);
+  const [redoStack, setRedoStack] = useState<Clip[][]>([]);
   const [tracks, setTracks] = useState<Track[]>([{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
   const [selected, setSelected] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<Clip | null>(null);
@@ -45,6 +47,18 @@ function App() {
   const pixelsPerSecond = 48 * zoom;
   const previewClip = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>b.start-a.start)[0] ?? (active?.kind === "video" ? active : undefined);
   const selectedTrack = tracks.find(t => t.id === active?.track);
+  const commitClips = (update: Clip[] | ((old:Clip[])=>Clip[])) => {
+    const next = typeof update === "function" ? update(clips) : update;
+    setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);setClips(next);
+  };
+  const undo = () => {
+    if(!undoStack.length)return;
+    setRedoStack(old=>[...old,clips]);setClips(undoStack[undoStack.length-1]);setUndoStack(old=>old.slice(0,-1));
+  };
+  const redo = () => {
+    if(!redoStack.length)return;
+    setUndoStack(old=>[...old,clips]);setClips(redoStack[redoStack.length-1]);setRedoStack(old=>old.slice(0,-1));
+  };
 
   const addMedia = async () => {
     const items = await window.playStudio.openMedia();
@@ -67,14 +81,14 @@ function App() {
     if (!active || playhead <= active.start + 0.02 || playhead >= active.start + active.duration - 0.02) return;
     const leftDuration = playhead - active.start;
     const rightDuration = active.duration - leftDuration;
-    setClips(old => old.flatMap(c => c.id !== active.id ? [c] : [
+    commitClips(old => old.flatMap(c => c.id !== active.id ? [c] : [
       {...c, duration:leftDuration, sourceDuration:leftDuration},
       {...c, id:crypto.randomUUID(), name:c.name+" (parte 2)", start:playhead, sourceStart:c.sourceStart+leftDuration, duration:rightDuration, sourceDuration:rightDuration}
     ]));
   };
-  const remove = () => { if (selected) { setClips(old=>old.filter(c=>c.id!==selected)); setSelected(null); } };
+  const remove = () => { if (selected) { commitClips(old=>old.filter(c=>c.id!==selected)); setSelected(null); } };
   const copy = () => { if (active) setClipboard({...active}); };
-  const paste = () => { if (clipboard) { const clone={...clipboard,id:crypto.randomUUID(),start:playhead}; setClips(old=>[...old,clone]);setSelected(clone.id); } };
+  const paste = () => { if (clipboard) { const clone={...clipboard,id:crypto.randomUUID(),start:playhead}; commitClips(old=>[...old,clone]);setSelected(clone.id); } };
   const cut = () => { if (active) { setClipboard({...active});remove(); } };
   const addTrack = (kind:"video"|"audio") => {
     const count=tracks.filter(t=>t.kind===kind).length+1;
@@ -157,7 +171,7 @@ function App() {
     const onKey=(event:KeyboardEvent)=>{
       if((event.target as HTMLElement)?.tagName==="INPUT")return;
       const key=event.key.toLowerCase();
-      if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
+      if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}\n      else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}\n      else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
       else if((event.ctrlKey||event.metaKey)&&key==="o"){event.preventDefault();void load();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
@@ -191,16 +205,16 @@ function App() {
       <aside className="inspector">
         <div className="panel-heading"><b>PROPIEDADES</b></div>
         {active?<><div className="property-title">{active.name}</div><label>Tipo <span>{active.kind==="video"?"Video":"Audio"}</span></label><label>Pista <span>{selectedTrack?.name??active.track}</span></label>
-          <label>Inicio (s)<input type="number" min="0" step="0.1" value={active.start.toFixed(1)} onChange={e=>setClips(old=>old.map(c=>c.id===active.id?{...c,start:Math.max(0,Number(e.target.value)||0)}:c))}/></label>
-          <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>setClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration,Number(e.target.value)||.1))}:c))}/></label>
-          {active.kind==="audio"&&<label className="volume-property">Volumen <input type="range" min="0" max="2" step=".05" value={active.volume} onChange={e=>setClips(old=>old.map(c=>c.id===active.id?{...c,volume:Number(e.target.value)}:c))}/><span>{Math.round(active.volume*100)}%</span></label>}
+          <label>Inicio (s)<input type="number" min="0" step="0.1" value={active.start.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,start:Math.max(0,Number(e.target.value)||0)}:c))}/></label>
+          <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration,Number(e.target.value)||.1))}:c))}/></label>
+          {active.kind==="audio"&&<label className="volume-property">Volumen <input type="range" min="0" max="2" step=".05" value={active.volume} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,volume:Number(e.target.value)}:c))}/><span>{Math.round(active.volume*100)}%</span></label>}
           <button className="danger-button" onClick={remove}>Eliminar clip</button>
         </>:<div className="inspector-empty">Selecciona un clip para ajustar sus propiedades.</div>}
       </aside>
     </main>
     <section className="timeline">
       <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Arrastra clips para moverlos y sus bordes para recortarlos</span></div>
-        <div className="tools"><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
+        <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
       </div>
       <div className="timeline-scroll">
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
