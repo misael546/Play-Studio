@@ -36,4 +36,4 @@ npm run dist
 El instalador NSIS se genera en la carpeta `release`.
 
 ## Nota técnica
-Esta versión ya incluye el primer motor de exportación MP4. La previsualización multipista sincronizada, audio original incrustado en los clips de video, transiciones, títulos, efectos y mezcla avanzada siguen siendo etapas pendientes de desarrollo y pruebas.
+Esta versión incluye el primer motor de exportación MP4, fundidos, títulos, ajustes básicos de imagen y mezcla de pistas de audio independientes. Siguen pendientes el audio original incrustado en clips de video, transiciones avanzadas y una pasada completa de pruebas de uso real.
