@@ -4,13 +4,14 @@ import type { MediaItem, ExportClip, ExportRequest } from "../../preload";
 import "./style.css";
 
 type Track = { id: string; name: string; kind: "video" | "audio" };
-type Clip = MediaItem & { start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
+type Clip = MediaItem & { waveform?: number[]; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
 declare global {
   interface Window {
     playStudio: {
       openMedia: () => Promise<MediaItem[]>;
       relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
+      getWaveform: (filePath: string, duration: number) => Promise<number[]>;
       saveProject: (data: string) => Promise<boolean>;
       loadProject: () => Promise<string | null>;
       exportVideo: (request: ExportRequest) => Promise<{ canceled: boolean; path?: string }>;
@@ -80,7 +81,11 @@ function App() {
     try{
     const items = await window.playStudio.openMedia();
     if (!items.length) return;
-    const prepared = await Promise.all(items.map(async item => ({...item, mediaDuration: await readDuration(item)})));
+    const prepared = await Promise.all(items.map(async item => {
+      const mediaDuration=await readDuration(item);
+      const waveform=item.kind==="audio"&&mediaDuration>0?await window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):undefined;
+      return {...item,mediaDuration,waveform};
+    }));
     const valid = prepared.filter(item => item.mediaDuration > 0);
     const invalid = prepared.filter(item => item.mediaDuration <= 0);
     if(invalid.length)alert("No se pudo leer la duración de estos archivos y no se añadieron:\\n"+invalid.map(item=>item.name).join("\\n")+"\\nComprueba que el archivo no esté dañado y que Windows pueda reproducirlo.");
@@ -112,10 +117,11 @@ function App() {
         alert("No se pudo leer la duración del archivo seleccionado.");
         return;
       }
+      const waveform=active.kind==="audio"?await window.playStudio.getWaveform(replacement.path,mediaDuration).catch(()=>[]):undefined;
       commitClips(old=>old.map(clip=>{
         if(clip.id!==active.id)return clip;
         const sourceStart=Math.min(clip.sourceStart,mediaDuration-0.1);
-        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart))};
+        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart)),waveform};
       }));
     }catch(error){alert(error instanceof Error?"No se pudo reemplazar el medio: "+error.message:"No se pudo reemplazar el medio.");}
   };
