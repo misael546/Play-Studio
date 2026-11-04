@@ -290,7 +290,7 @@ function App() {
   useEffect(()=>{
     for(const clip of previewLayers){
       const video=videoRefs.current[clip.id];if(!video)continue;
-      const elapsed=Math.max(0,playhead-clip.start);
+      const elapsed=Math.min(clip.duration,Math.max(0,playhead-clip.start));
       video.volume=Math.min(1,Math.max(0,clip.volume*fadeGain(clip,elapsed)));
     }
   },[previewLayers,playhead]);
@@ -398,7 +398,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,opacity:fadeGain(clip,Math.max(0,playhead-clip.start)),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onLoadedMetadata={e=>{const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}</div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onLoadedMetadata={e=>{const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}</div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
