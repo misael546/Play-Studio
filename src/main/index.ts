@@ -53,7 +53,8 @@ app.whenReady().then(() => {
     return readFile(result.filePaths[0], "utf8");
   });
   ipcMain.handle("export:render", async (event, clips: ExportClip[]) => {
-    if (!ffmpegPath) throw new Error("No se encontró el motor FFmpeg incluido.");
+    const ffmpegExecutable = ffmpegPath;
+    if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
     if (!Array.isArray(clips) || clips.length === 0) throw new Error("Agrega al menos un clip a la línea de tiempo.");
     const safeClips: ExportClip[] = [];
     for (const clip of clips) {
@@ -92,8 +93,9 @@ app.whenReady().then(() => {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
     args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
+    const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     return await new Promise((resolve, reject) => {
-      const child = spawn(app.isPackaged ? ffmpegPath.replace("app.asar", "app.asar.unpacked") : ffmpegPath, args, { windowsHide: true });
+      const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
       let errorText = "";
       child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 12000) errorText = errorText.slice(-12000); });
       child.stdout.on("data", chunk => {
