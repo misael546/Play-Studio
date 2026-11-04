@@ -85,8 +85,8 @@ function App() {
     const leftDuration = playhead - active.start;
     const rightDuration = active.duration - leftDuration;
     commitClips(old => old.flatMap(c => c.id !== active.id ? [c] : [
-      {...c, duration:leftDuration, sourceDuration:leftDuration},
-      {...c, id:crypto.randomUUID(), name:c.name+" (parte 2)", start:playhead, sourceStart:c.sourceStart+leftDuration, duration:rightDuration, sourceDuration:rightDuration}
+      {...c, duration:leftDuration},
+      {...c, id:crypto.randomUUID(), name:c.name+" (parte 2)", start:playhead, sourceStart:c.sourceStart+leftDuration, duration:rightDuration}
     ]));
   };
   const remove = () => { if (selected) { commitClips(old=>old.filter(c=>c.id!==selected)); setSelected(null); } };
@@ -141,7 +141,7 @@ function App() {
           return {...c,start:Math.max(0,drag.clip.start+change),sourceStart:drag.clip.sourceStart+change,duration:drag.clip.duration-change,sourceDuration:drag.clip.duration-change};
         }
         const next=Math.max(0.15,drag.clip.duration+delta);
-        return {...c,duration:Math.min(next,drag.clip.sourceDuration)};
+        return {...c,duration:Math.min(next,drag.clip.sourceDuration-drag.clip.sourceStart)};
       }));
     };
     const onUp=()=>{dragRef.current=null;};
@@ -230,7 +230,7 @@ function App() {
         <div className="panel-heading"><b>PROPIEDADES</b></div>
         {active?<><div className="property-title">{active.name}</div><label>Tipo <span>{active.kind==="video"?"Video":"Audio"}</span></label><label>Pista <span>{selectedTrack?.name??active.track}</span></label>
           <label>Inicio (s)<input type="number" min="0" step="0.1" value={active.start.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,start:Math.max(0,Number(e.target.value)||0)}:c))}/></label>
-          <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration,Number(e.target.value)||.1))}:c))}/></label>
+          <label>Duración (s)<input type="number" min="0.1" step="0.1" value={active.duration.toFixed(1)} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,duration:Math.max(.1,Math.min(active.sourceDuration-active.sourceStart,Number(e.target.value)||.1))}:c))}/></label>
           <label>Fundido entrada (s)<input type="number" min="0" step=".1" max={active.duration} value={active.fadeIn} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,fadeIn:Math.max(0,Math.min(active.duration,Number(e.target.value)||0))}:c))}/></label>
           <label>Fundido salida (s)<input type="number" min="0" step=".1" max={active.duration} value={active.fadeOut} onChange={e=>commitClips(old=>old.map(c=>c.id===active.id?{...c,fadeOut:Math.max(0,Math.min(active.duration,Number(e.target.value)||0))}:c))}/></label>
           {active.kind==="video"&&<>
