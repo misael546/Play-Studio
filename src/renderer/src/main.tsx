@@ -159,6 +159,19 @@ function App() {
   },[playing,previewClip?.id]);
 
   useEffect(()=>{
+    for(const clip of clips.filter(c=>c.kind==="audio")){
+      const audio=audioRefs.current[clip.id];if(!audio)continue;
+      const inRange=playing&&playhead>=clip.start&&playhead<clip.start+clip.duration;
+      if(inRange){
+        const wanted=clip.sourceStart+(playhead-clip.start);
+        if(audio.paused||Math.abs(audio.currentTime-wanted)>0.3){try{audio.currentTime=wanted;}catch{}}
+        audio.volume=Math.min(1,Math.max(0,clip.volume));
+        if(audio.paused)void audio.play().catch(()=>{});
+      }else audio.pause();
+    }
+  },[clips,playhead,playing]);
+
+  useEffect(()=>{
     if(!playing)return;
     const timer=window.setInterval(()=>setPlayhead(old=>{
       const next=old+0.05;
