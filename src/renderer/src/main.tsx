@@ -134,7 +134,7 @@ function App() {
     setExporting(true);setExportProgress(0);
     const stop=window.playStudio.onExportProgress(setExportProgress);
     try {
-      const payload:ExportClip[]=clips.map(c=>({path:c.path,kind:c.kind,start:c.start,sourceStart:c.sourceStart,duration:c.duration,volume:c.volume,fadeIn:c.fadeIn,fadeOut:c.fadeOut,brightness:c.brightness,contrast:c.contrast,saturation:c.saturation,title:c.title,titleSize:c.titleSize,titlePosition:c.titlePosition}));
+      const payload:ExportClip[]=clips.map(c=>({path:c.path,kind:c.kind,start:c.start,sourceStart:c.sourceStart,duration:c.duration,trackOrder:tracks.findIndex(t=>t.id===c.track),volume:c.volume,fadeIn:c.fadeIn,fadeOut:c.fadeOut,brightness:c.brightness,contrast:c.contrast,saturation:c.saturation,title:c.title,titleSize:c.titleSize,titlePosition:c.titlePosition}));
       const request:ExportRequest={clips:payload,resolution,fps};
       const result=await window.playStudio.exportVideo(request);
       if(!result.canceled) alert("Exportación terminada.\n"+result.path);
