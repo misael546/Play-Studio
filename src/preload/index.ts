@@ -4,6 +4,7 @@ export type ExportClip = { path: string; kind: "video" | "audio"; start: number;
 export type ExportRequest = { clips: ExportClip[]; resolution: "720p" | "1080p" | "4k"; fps: 24 | 30 | 60 };
 contextBridge.exposeInMainWorld("playStudio", {
   openMedia: (): Promise<MediaItem[]> => ipcRenderer.invoke("media:open"),
+  relinkMedia: (kind: "video" | "audio"): Promise<MediaItem | null> => ipcRenderer.invoke("media:relink", kind),
   saveProject: (data: string): Promise<boolean> => ipcRenderer.invoke("project:save", data),
   loadProject: (): Promise<string | null> => ipcRenderer.invoke("project:load"),
   exportVideo: (request: ExportRequest): Promise<{ canceled: boolean; path?: string }> => ipcRenderer.invoke("export:render", request),
