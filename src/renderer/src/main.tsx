@@ -38,7 +38,8 @@ function App() {
   const [assistantText, setAssistantText] = useState("");
   const [zoom, setZoom] = useState(1);
   const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);\n  const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
+  const [exportProgress, setExportProgress] = useState(0);
+  const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
   const [fps,setFps] = useState<24|30|60>(30);
   const [projectName, setProjectName] = useState("Proyecto sin título");
   const videoRef = useRef<HTMLVideoElement>(null);
