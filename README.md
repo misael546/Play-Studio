@@ -16,6 +16,16 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Crear, guardar y abrir proyectos `.playstudio`, con confirmación antes de descartar cambios.
 - Exportación MP4 mediante FFmpeg incluido, con progreso, cancelación, mezcla del audio original de los videos y pistas independientes, orden de capas coherente y limitador para reducir saturación.
 
+## Atajos de teclado
+- `Ctrl + N`: nuevo proyecto.
+- `Ctrl + O`: abrir proyecto.
+- `Ctrl + S`: guardar proyecto.
+- `Espacio`: reproducir o pausar.
+- `← / →`: avanzar o retroceder un fotograma.
+- `S`: dividir el clip seleccionado.
+- `Ctrl + Z`: deshacer.
+- `Ctrl + Y` o `Ctrl + Shift + Z`: rehacer.
+
 ## Formatos de entrada
 MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La compatibilidad final depende de los códecs incluidos en FFmpeg.
 
