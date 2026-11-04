@@ -55,6 +55,7 @@ function App() {
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
   const playbackFrameRef = useRef<number | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const active = clips.find(c => c.id === selected);
   const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
   const duration = Math.max(30, contentDuration);
@@ -315,6 +316,15 @@ function App() {
   },[playing,contentDuration]);
 
   useEffect(()=>{
+    if(!playing)return;
+    const container=timelineScrollRef.current;
+    if(!container)return;
+    const playheadX=150+playhead*pixelsPerSecond;
+    const visibleRight=container.scrollLeft+container.clientWidth;
+    if(playheadX>visibleRight-100)container.scrollLeft=Math.max(0,playheadX-container.clientWidth*0.75);
+  },[playhead,playing,pixelsPerSecond]);
+
+  useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
       const target=event.target as HTMLElement;if(["INPUT","TEXTAREA","SELECT","BUTTON"].includes(target?.tagName)||target?.isContentEditable)return;
       const key=event.key.toLowerCase();
@@ -380,8 +390,8 @@ function App() {
       <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Imán: alinea clips con el cabezal y otros clips; arrastra bordes para recortar</span></div>
         <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
       </div>
-      <div className="timeline-scroll">
-        <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
+      <div className="timeline-scroll" ref={timelineScrollRef}>
+        <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
         {tracks.map(track=><div className="track-row" key={track.id}>
           <div className="track-label">{track.name}</div>
           <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
