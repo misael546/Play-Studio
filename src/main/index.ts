@@ -56,13 +56,13 @@ app.whenReady().then(() => {
     return readFile(result.filePaths[0], "utf8");
   });
   ipcMain.handle("export:cancel", () => {
-    if (!exportProcess) return false;
     exportCanceled = true;
-    exportProcess.kill();
+    if (exportProcess) exportProcess.kill();
     return true;
   });
   ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {
     if (exportProcess) throw new Error("Ya hay una exportación en curso.");
+    exportCanceled = false;
     const clips = request.clips;
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
@@ -82,7 +82,7 @@ app.whenReady().then(() => {
     if (!safeClips.length) throw new Error("No hay clips válidos para exportar.");
     const totalDuration = Math.max(...safeClips.map(c => c.start + c.duration));
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
-    if (target.canceled || !target.filePath) return { canceled: true };
+    if (target.canceled || !target.filePath || exportCanceled) { exportCanceled = false; return { canceled: true }; }
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
     const separateAudios = safeClips.filter(c => c.kind === "audio");
     const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
@@ -141,9 +141,9 @@ app.whenReady().then(() => {
     args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
     const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     return await new Promise((resolve, reject) => {
+      if (exportCanceled) { exportCanceled = false; resolve({ canceled: true }); return; }
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
       exportProcess = child;
-      exportCanceled = false;
       let errorText = "";
       child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 12000) errorText = errorText.slice(-12000); });
       child.stdout.on("data", chunk => {
