@@ -272,7 +272,7 @@ function App() {
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{
-      const target=event.target as HTMLElement;if(["INPUT","TEXTAREA","SELECT"].includes(target?.tagName)||target?.isContentEditable)return;
+      const target=event.target as HTMLElement;if(["INPUT","TEXTAREA","SELECT","BUTTON"].includes(target?.tagName)||target?.isContentEditable)return;
       const key=event.key.toLowerCase();
       if((event.ctrlKey||event.metaKey)&&event.shiftKey&&key==="z"){event.preventDefault();redo();}
       else if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}
