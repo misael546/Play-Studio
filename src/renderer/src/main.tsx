@@ -64,7 +64,7 @@ function App() {
     const items = await window.playStudio.openMedia();
     if (!items.length) return;
     const prepared = await Promise.all(items.map(async item => ({...item, mediaDuration: await readDuration(item)})));
-    setClips(old => {
+    commitClips(old => {
       const next = [...old];
       let cursor = Math.max(0, ...next.map(c => c.start + c.duration));
       for (const item of prepared) {
