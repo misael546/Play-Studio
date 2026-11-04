@@ -25,6 +25,12 @@ const readDuration = (item: MediaItem) => new Promise<number>(resolve => {
   element.onerror = () => resolve(10);
   element.src = item.url;
 });
+const fadeGain = (clip: Clip, elapsed: number) => {
+  const fadeInGain = clip.fadeIn > 0 ? elapsed / clip.fadeIn : 1;
+  const remaining = clip.duration - elapsed;
+  const fadeOutGain = clip.fadeOut > 0 ? remaining / clip.fadeOut : 1;
+  return Math.max(0, Math.min(1, fadeInGain, fadeOutGain));
+};
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<Clip[][]>([]);
@@ -175,8 +181,11 @@ function App() {
 
   useEffect(()=>{
     const video=videoRef.current;
-    if(video&&previewClip) video.volume=Math.min(1,Math.max(0,previewClip.volume));
-  },[previewClip?.id,previewClip?.volume]);
+    if(video&&previewClip){
+      const elapsed=Math.max(0,playhead-previewClip.start);
+      video.volume=Math.min(1,Math.max(0,previewClip.volume*fadeGain(previewClip,elapsed)));
+    }
+  },[previewClip?.id,previewClip?.volume,previewClip?.fadeIn,previewClip?.fadeOut,playhead]);
 
   useEffect(()=>{
     const video=videoRef.current;if(!video||!previewClip||playing)return;
@@ -197,7 +206,8 @@ function App() {
       if(inRange){
         const wanted=clip.sourceStart+(playhead-clip.start);
         if(audio.paused||Math.abs(audio.currentTime-wanted)>0.3){try{audio.currentTime=wanted;}catch{}}
-        audio.volume=Math.min(1,Math.max(0,clip.volume));
+        const elapsed=playhead-clip.start;
+        audio.volume=Math.min(1,Math.max(0,clip.volume*fadeGain(clip,elapsed)));
         if(audio.paused)void audio.play().catch(()=>{});
       }else audio.pause();
     }
@@ -251,7 +261,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite"><video ref={videoRef} src={previewClip.url} style={{filter:`brightness(${100+previewClip.brightness*100}%) contrast(${previewClip.contrast*100}%) saturate(${previewClip.saturation*100}%)`,opacity:fadeGain(previewClip,Math.max(0,playhead-previewClip.start))}} controls={false} onLoadedMetadata={e=>{const wanted=previewClip.sourceStart+Math.min(previewClip.duration,Math.max(0,playhead-previewClip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} onTimeUpdate={e=>{if(playing)setPlayhead(previewClip.start+e.currentTarget.currentTime-previewClip.sourceStart);}} /><div className={"preview-title "+previewClip.titlePosition} style={{fontSize:previewClip.titleSize+"px"}}>{previewClip.title}</div></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
