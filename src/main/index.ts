@@ -106,7 +106,14 @@ app.whenReady().then(() => {
       targetPath = result.filePath;
     }
     const fs = await import("node:fs/promises");
-    await fs.writeFile(targetPath, data, "utf8");
+    const temporaryPath = targetPath + "." + crypto.randomUUID() + ".tmp";
+    try {
+      await fs.writeFile(temporaryPath, data, "utf8");
+      await fs.rename(temporaryPath, targetPath);
+    } catch (error) {
+      await fs.unlink(temporaryPath).catch(() => {});
+      throw error;
+    }
     currentProjectPath = targetPath;
     return true;
   });
