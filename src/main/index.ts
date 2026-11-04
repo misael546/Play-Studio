@@ -43,6 +43,18 @@ app.whenReady().then(() => {
       return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind: audio ? "audio" : "video", size: info.size };
     }));
   });
+  ipcMain.handle("media:relink", async (_event, kind: "video" | "audio") => {
+    const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [
+      { name: kind === "audio" ? "Archivos de audio" : "Archivos de video", extensions: kind === "audio" ? ["mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"] : ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob"] },
+      { name: "Todos los archivos", extensions: ["*"] }
+    ]});
+    if (result.canceled || !result.filePaths[0]) return null;
+    const filePath = result.filePaths[0];
+    const info = await stat(filePath);
+    if (!info.isFile()) throw new Error("Selecciona un archivo válido.");
+    const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
+    return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind, size: info.size };
+  });
   ipcMain.handle("project:save", async (_event, data: string) => {
     const result = await dialog.showSaveDialog({ defaultPath: "Mi proyecto.playstudio", filters: [{ name: "Proyecto Play Studio", extensions: ["playstudio"] }] });
     if (result.canceled || !result.filePath) return false;
