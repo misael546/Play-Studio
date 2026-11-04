@@ -8,7 +8,8 @@ import ffmpegPath from "ffmpeg-static";
 protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard: true, supportFetchAPI: true, stream: true, secure: true } }]);
 let mainWindow: BrowserWindow | null = null;
 
-type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; volume?: number };
+type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
+const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/'/g,"\\\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\\[/g,"\\\\[").replace(/\\]/g,"\\\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1500, height: 920, minWidth: 1050, minHeight: 680,
@@ -52,7 +53,7 @@ app.whenReady().then(() => {
     if (result.canceled || !result.filePaths[0]) return null;
     return readFile(result.filePaths[0], "utf8");
   });
-  ipcMain.handle("export:render", async (event, clips: ExportClip[]) => {
+  ipcMain.handle("export:render", async (event, request: { clips: ExportClip[]; resolution?: string; fps?: number }) => {\n    const clips = request.clips;
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
     if (!Array.isArray(clips) || clips.length === 0) throw new Error("Agrega al menos un clip a la línea de tiempo.");
@@ -71,13 +72,25 @@ app.whenReady().then(() => {
     const args: string[] = ["-y"];
     safeClips.forEach(c => args.push("-i", c.path));
     const filters: string[] = [];
-    filters.push("color=c=black:s=1920x1080:r=30:d=" + totalDuration.toFixed(3) + "[base0]");
+    filters.push("color=c=black:s="+width+"x"+height+":r="+fps+":d=" + totalDuration.toFixed(3) + "[base0]");
     let base = "base0";
     videos.forEach((clip, index) => {
       const inputIndex = safeClips.indexOf(clip);
       const label = "v" + index;
       const next = "base" + (index + 1);
-      filters.push("[" + inputIndex + ":v:0]trim=start=" + clip.sourceStart.toFixed(3) + ":duration=" + clip.duration.toFixed(3) + ",setpts=PTS-STARTPTS,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,setpts=PTS+" + clip.start.toFixed(3) + "/TB[" + label + "]");
+      const videoFilters = ["trim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"setpts=PTS-STARTPTS","scale="+width+":"+height+":force_original_aspect_ratio=decrease","pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2","setsar=1","fps="+fps,"format=rgba","eq=brightness="+Math.max(-1,Math.min(1,clip.brightness??0)).toFixed(2)+":contrast="+Math.max(0,Math.min(3,clip.contrast??1)).toFixed(2)+":saturation="+Math.max(0,Math.min(3,clip.saturation??1)).toFixed(2)];
+      const fadeIn=Math.max(0,Math.min(clip.duration,clip.fadeIn??0));
+      const fadeOut=Math.max(0,Math.min(clip.duration,clip.fadeOut??0));
+      if(fadeIn>0)videoFilters.push("fade=t=in:st=0:d="+fadeIn.toFixed(3)+":alpha=1");
+      if(fadeOut>0)videoFilters.push("fade=t=out:st="+Math.max(0,clip.duration-fadeOut).toFixed(3)+":d="+fadeOut.toFixed(3)+":alpha=1");
+      if(clip.title?.trim()){
+        const y=clip.titlePosition==="top"?"60":clip.titlePosition==="center"?"(h-text_h)/2":"h-text_h-60";
+        const title=escapeFilterText(clip.title.trim());
+        const size=Math.max(12,Math.min(160,clip.titleSize??48));
+        videoFilters.push("drawtext=fontfile='C\\\\:/Windows/Fonts/segoeui.ttf':text='"+title+"':fontcolor=white:fontsize="+size+":x=(w-text_w)/2:y="+y+":box=1:boxcolor=black@0.45:boxborderw=12");
+      }
+      videoFilters.push("setpts=PTS+"+clip.start.toFixed(3)+"/TB");
+      filters.push("["+inputIndex+":v:0]"+videoFilters.join(",")+"["+label+"]");
       filters.push("[" + base + "][" + label + "]overlay=eof_action=pass:enable='between(t," + clip.start.toFixed(3) + "," + (clip.start + clip.duration).toFixed(3) + ")'[" + next + "]");
       base = next;
     });
@@ -86,13 +99,19 @@ app.whenReady().then(() => {
       audios.forEach((clip, index) => {
         const inputIndex = safeClips.indexOf(clip);
         const delay = Math.max(0, Math.round(clip.start * 1000));
-        filters.push("[" + inputIndex + ":a:0]atrim=start=" + clip.sourceStart.toFixed(3) + ":duration=" + clip.duration.toFixed(3) + ",asetpts=PTS-STARTPTS,volume=" + Math.max(0, Math.min(2, clip.volume ?? 1)).toFixed(2) + ",adelay=" + delay + "|" + delay + "[a" + index + "]");
+        const audioFilters=["atrim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"asetpts=PTS-STARTPTS","volume="+Math.max(0,Math.min(2,clip.volume??1)).toFixed(2)];
+        const fadeIn=Math.max(0,Math.min(clip.duration,clip.fadeIn??0));
+        const fadeOut=Math.max(0,Math.min(clip.duration,clip.fadeOut??0));
+        if(fadeIn>0)audioFilters.push("afade=t=in:st=0:d="+fadeIn.toFixed(3));
+        if(fadeOut>0)audioFilters.push("afade=t=out:st="+Math.max(0,clip.duration-fadeOut).toFixed(3)+":d="+fadeOut.toFixed(3));
+        audioFilters.push("adelay="+delay+"|"+delay);
+        filters.push("["+inputIndex+":a:0]"+audioFilters.join(",")+"[a"+index+"]");
       });
       filters.push(audios.map((_,i)=>"[a"+i+"]").join("") + "amix=inputs=" + audios.length + ":duration=longest:dropout_transition=0,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     } else {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
-    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
+    args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
     const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     return await new Promise((resolve, reject) => {
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
