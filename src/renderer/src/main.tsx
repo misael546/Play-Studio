@@ -136,21 +136,36 @@ function App() {
       const target= document.elementFromPoint(event.clientX,event.clientY)?.closest("[data-track-id]") as HTMLElement|null;
       const targetTrack=target?.dataset.trackId;
       const allowedTrack=targetTrack&&tracks.some(t=>t.id===targetTrack&&t.kind===drag.clip.kind)?targetTrack:drag.clip.track;
-      setClips(old=>old.map(c=>{
-        if(c.id!==drag.id)return c;
-        if(drag.mode==="move")return {...c,start:Math.max(0,drag.clip.start+delta),track:allowedTrack};
-        if(drag.mode==="left"){
-          const change=Math.min(drag.clip.duration-0.15,Math.max(-drag.clip.sourceStart,-drag.clip.start,delta));
-          return {...c,start:Math.max(0,drag.clip.start+change),sourceStart:drag.clip.sourceStart+change,duration:drag.clip.duration-change};
+      setClips(old=>{
+        const others=old.filter(c=>c.id!==drag.id);
+        let movedStart=Math.max(0,drag.clip.start+delta);
+        if(drag.mode==="move"){
+          const snapPoints=[playhead,...others.flatMap(c=>[c.start,c.start+c.duration])];
+          let bestDifference=8/pixelsPerSecond;
+          for(const point of snapPoints){
+            for(const edge of [movedStart,movedStart+drag.clip.duration]){
+              const difference=point-edge;
+              if(Math.abs(difference)<Math.abs(bestDifference))bestDifference=difference;
+            }
+          }
+          movedStart=Math.max(0,movedStart+bestDifference);
         }
-        const next=Math.max(0.15,drag.clip.duration+delta);
-        return {...c,duration:Math.min(next,drag.clip.sourceDuration-drag.clip.sourceStart)};
-      }));
+        return old.map(c=>{
+          if(c.id!==drag.id)return c;
+          if(drag.mode==="move")return {...c,start:movedStart,track:allowedTrack};
+          if(drag.mode==="left"){
+            const change=Math.min(drag.clip.duration-0.15,Math.max(-drag.clip.sourceStart,-drag.clip.start,delta));
+            return {...c,start:Math.max(0,drag.clip.start+change),sourceStart:drag.clip.sourceStart+change,duration:drag.clip.duration-change};
+          }
+          const next=Math.max(0.15,drag.clip.duration+delta);
+          return {...c,duration:Math.min(next,drag.clip.sourceDuration-drag.clip.sourceStart)};
+        });
+      });
     };
     const onUp=()=>{dragRef.current=null;};
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);
     return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);};
-  },[pixelsPerSecond,tracks]);
+  },[pixelsPerSecond,tracks,playhead]);
 
   useEffect(()=>{
     const video=videoRef.current;
@@ -254,7 +269,7 @@ function App() {
       </aside>
     </main>
     <section className="timeline">
-      <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Arrastra clips para moverlos y sus bordes para recortarlos</span></div>
+      <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Imán: alinea clips con el cabezal y otros clips; arrastra bordes para recortar</span></div>
         <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
       </div>
       <div className="timeline-scroll">
