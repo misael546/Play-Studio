@@ -172,7 +172,8 @@ function App() {
       if((event.target as HTMLElement)?.tagName==="INPUT")return;
       const key=event.key.toLowerCase();
       if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}
-      else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}\n      else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
+      else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}
+      else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
       else if((event.ctrlKey||event.metaKey)&&key==="o"){event.preventDefault();void load();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
