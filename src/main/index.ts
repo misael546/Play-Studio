@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, net } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, unlink } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
 
@@ -163,6 +163,7 @@ app.whenReady().then(() => {
         exportProcess = null;
         if (exportCanceled) {
           exportCanceled = false;
+          void unlink(target.filePath).catch(() => {});
           resolve({ canceled: true });
         } else if (code === 0) {
           event.sender.send("export:progress", 100);
