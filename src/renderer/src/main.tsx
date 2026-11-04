@@ -196,11 +196,11 @@ function App() {
   },[previewLayers,playhead]);
 
   useEffect(()=>{
-    if(playing)return;
     for(const clip of previewLayers){
       const video=videoRefs.current[clip.id];if(!video)continue;
       const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));
-      if(Math.abs(video.currentTime-wanted)>0.18){try{video.currentTime=wanted;}catch{}}
+      const tolerance=playing?0.25:0.18;
+      if(Math.abs(video.currentTime-wanted)>tolerance){try{video.currentTime=wanted;}catch{}}
     }
   },[previewLayers,playhead,playing]);
 
