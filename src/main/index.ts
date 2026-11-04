@@ -66,6 +66,7 @@ app.whenReady().then(() => {
     const clips = request.clips;
     const ffmpegExecutable = ffmpegPath;
     if (!ffmpegExecutable) throw new Error("No se encontró el motor FFmpeg incluido.");
+    const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     if (!Array.isArray(clips) || clips.length === 0) throw new Error("Agrega al menos un clip a la línea de tiempo.");
     const safeClips: ExportClip[] = [];
     for (const clip of clips) {
@@ -87,7 +88,7 @@ app.whenReady().then(() => {
     const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
     const separateAudios = safeClips.filter(c => c.kind === "audio");
     const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
-      const probe = spawn(ffmpegExecutable, ["-hide_banner", "-i", clip.path], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+      const probe = spawn(executable, ["-hide_banner", "-i", clip.path], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
       let probeText = "";
       probe.stderr.on("data", chunk => { probeText += chunk.toString(); });
       probe.on("error", () => resolve(false));
@@ -140,7 +141,6 @@ app.whenReady().then(() => {
       filters.push("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=" + totalDuration.toFixed(3) + "[aout]");
     }
     args.push("-filter_complex", filters.join(";"), "-map", "[vout]", "-map", "[aout]", "-t", totalDuration.toFixed(3), "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", target.filePath);
-    const executable = app.isPackaged ? ffmpegExecutable.replace("app.asar", "app.asar.unpacked") : ffmpegExecutable;
     return await new Promise((resolve, reject) => {
       if (exportCanceled) { exportCanceled = false; resolve({ canceled: true }); return; }
       const child = spawn(executable, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
