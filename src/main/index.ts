@@ -8,7 +8,7 @@ import ffmpegPath from "ffmpeg-static";
 protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard: true, supportFetchAPI: true, stream: true, secure: true } }]);
 let mainWindow: BrowserWindow | null = null;
 
-type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
+type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -74,7 +74,7 @@ app.whenReady().then(() => {
     const totalDuration = Math.max(...safeClips.map(c => c.start + c.duration));
     const target = await dialog.showSaveDialog({ defaultPath: "Video terminado.mp4", filters: [{ name: "Video MP4", extensions: ["mp4"] }] });
     if (target.canceled || !target.filePath) return { canceled: true };
-    const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>a.start-b.start);
+    const videos = safeClips.filter(c => c.kind === "video").sort((a,b)=>(a.trackOrder??0)-(b.trackOrder??0)||a.start-b.start);
     const separateAudios = safeClips.filter(c => c.kind === "audio");
     const videoAudioFlags = await Promise.all(videos.map(clip => new Promise<boolean>(resolve => {
       const probe = spawn(ffmpegExecutable, ["-hide_banner", "-i", clip.path], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
