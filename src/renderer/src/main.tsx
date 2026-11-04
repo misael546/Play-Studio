@@ -238,7 +238,7 @@ function App() {
     const container=timelineScrollRef.current;
     if(!container)return;
     const availableWidth=Math.max(240,container.clientWidth-170);
-    const totalSeconds=Math.max(30,contentDuration);
+    const totalSeconds=contentDuration>0?contentDuration:30;
     setZoom(Math.max(0.35,Math.min(4,availableWidth/(totalSeconds*48))));
     container.scrollLeft=0;
   };
