@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "description": "Editor de video de escritorio para Windows",
-  "main": "dist-electron/main.js",
+  "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run typecheck && npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -43,8 +43,7 @@
       "node_modules/ffmpeg-static/**"
     ],
     "files": [
-      "dist-electron/**",
-      "dist/**",
+      "out/**",
       "node_modules/**",
       "package.json"
     ],
