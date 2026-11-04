@@ -210,8 +210,17 @@ function App() {
       });
     };
     const onUp=()=>{dragRef.current=null;};
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerup",onUp);
-    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerup",onUp);};
+    const onCancel=()=>{dragRef.current=null;};
+    window.addEventListener("pointermove",onMove);
+    window.addEventListener("pointerup",onUp);
+    window.addEventListener("pointercancel",onCancel);
+    window.addEventListener("blur",onCancel);
+    return()=>{
+      window.removeEventListener("pointermove",onMove);
+      window.removeEventListener("pointerup",onUp);
+      window.removeEventListener("pointercancel",onCancel);
+      window.removeEventListener("blur",onCancel);
+    };
   },[pixelsPerSecond,tracks,playhead]);
 
   useEffect(()=>{
@@ -285,7 +294,6 @@ function App() {
       else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}
       else if((event.ctrlKey||event.metaKey)&&key==="n"){event.preventDefault();newProject();}
       else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
-      else if((event.ctrlKey||event.metaKey)&&key==="o"){event.preventDefault();void load();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
       else if((event.ctrlKey||event.metaKey)&&key==="x"){event.preventDefault();cut();}
