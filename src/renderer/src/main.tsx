@@ -151,6 +151,12 @@ function App() {
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
     } catch { alert("El archivo de proyecto no es válido."); }
   };
+  const newProject = () => {
+    if(clips.length&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
+    setProjectName("Proyecto sin título");
+    setTracks([{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
+    setClips([]);setSelected(null);setClipboard(null);setPlayhead(0);setPlaying(false);setUndoStack([]);setRedoStack([]);
+  };
   const exportVideo = async () => {
     if(!clips.some(c=>c.kind==="video")) { alert("Agrega al menos un video a la línea de tiempo antes de exportar.");return; }
     setExporting(true);setExportProgress(0);
@@ -277,6 +283,7 @@ function App() {
       if((event.ctrlKey||event.metaKey)&&event.shiftKey&&key==="z"){event.preventDefault();redo();}
       else if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}
       else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}
+      else if((event.ctrlKey||event.metaKey)&&key==="n"){event.preventDefault();newProject();}
       else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
       else if((event.ctrlKey||event.metaKey)&&key==="o"){event.preventDefault();void load();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
@@ -296,7 +303,7 @@ function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO</b><small>EDITOR DE VIDEO</small></div></div>
-      <nav><button onClick={load}>Abrir proyecto</button><button onClick={save}>Guardar proyecto</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
+      <nav><button onClick={newProject}>Nuevo proyecto</button><button onClick={load}>Abrir proyecto</button><button onClick={save}>Guardar proyecto</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
       <button className="assistant-toggle" onClick={()=>setAssistant(!assistant)}>✦ Asistente</button>
     </header>
     <div className="menubar"><span>Archivo</span><span>Editar</span><span>Ver</span><span>Clip</span><span>Ayuda</span><input className="project-name" value={projectName} onChange={e=>setProjectName(e.target.value)} aria-label="Nombre del proyecto"/></div>
