@@ -69,13 +69,16 @@ function App() {
     const prepared = await Promise.all(items.map(async item => ({...item, mediaDuration: await readDuration(item)})));
     commitClips(old => {
       const next = [...old];
-      let cursor = Math.max(0, ...next.map(c => c.start + c.duration));
+      const cursors: Record<"video"|"audio",number> = {
+        video: Math.max(0, ...next.filter(c=>c.kind==="video").map(c=>c.start+c.duration)),
+        audio: Math.max(0, ...next.filter(c=>c.kind==="audio").map(c=>c.start+c.duration))
+      };
       for (const item of prepared) {
         const track = tracks.find(t => t.kind === item.kind) ?? tracks[0];
         const {mediaDuration, ...media} = item;
-        const clip: Clip = {...media, start: cursor, duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
+        const clip: Clip = {...media, start: cursors[item.kind], duration: mediaDuration, sourceStart: 0, sourceDuration: mediaDuration, track: track.id, volume: 1, fadeIn:0, fadeOut:0, brightness:0, contrast:1, saturation:1, title:"", titleSize:48, titlePosition:"bottom"};
         next.push(clip);
-        cursor += item.mediaDuration;
+        cursors[item.kind] += item.mediaDuration;
       }
       return next;
     });
