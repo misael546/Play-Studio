@@ -46,7 +46,7 @@ function App() {
   const active = clips.find(c => c.id === selected);
   const duration = Math.max(30, ...clips.map(c => c.start + c.duration));
   const pixelsPerSecond = 48 * zoom;
-  const previewClip = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>b.start-a.start)[0] ?? (active?.kind === "video" ? active : undefined);
+  const previewClip = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>b.start-a.start)[0] ?? (!playing && active?.kind === "video" ? active : undefined);
   const selectedTrack = tracks.find(t => t.id === active?.track);
   const commitClips = (update: Clip[] | ((old:Clip[])=>Clip[])) => {
     const next = typeof update === "function" ? update(clips) : update;
