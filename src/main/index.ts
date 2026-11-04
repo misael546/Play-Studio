@@ -14,7 +14,7 @@ type ExportClip = { path: string; kind: "video" | "audio"; start: number; source
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1500, height: 920, minWidth: 1050, minHeight: 680,
+    width: 1280, height: 760, minWidth: 1050, minHeight: 680,
     backgroundColor: "#111318",
     webPreferences: { preload: join(__dirname, "../preload/index.js"), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
