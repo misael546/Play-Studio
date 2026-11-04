@@ -9,7 +9,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run typecheck && npm run build && electron-builder --win nsis"
+    "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "react": "^19.1.0",
