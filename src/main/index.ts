@@ -24,7 +24,7 @@ function createWindow() {
   });
   if (process.env.ELECTRON_RENDERER_URL) mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   else mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-  mainWindow.on("closed", () => { mainWindow = null; });
+  mainWindow.on("closed", () => { mainWindow = null; if (exportProcess) { exportCanceled = true; exportProcess.kill(); } });
 }
 
 app.whenReady().then(() => {
