@@ -17,7 +17,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Exportación MP4 mediante FFmpeg incluido, con progreso de exportación y mezcla del audio original de los videos con las pistas de audio añadidas.
 
 ## Formatos de entrada
-MP4, MOV, MKV, AVI, WebM, M4V, MP3, WAV, AAC, M4A, FLAC, OGG y WMA. La compatibilidad final depende de los códecs incluidos en FFmpeg.
+MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La compatibilidad final depende de los códecs incluidos en FFmpeg.
 
 ## Requisitos de desarrollo
 - Windows 10/11 de 64 bits
