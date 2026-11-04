@@ -196,7 +196,7 @@ function App() {
       const normalizedTracks=loadedTracks.length?[...loadedTracks]:[...defaultTracks];
       for(const kind of ["video","audio"] as const)if(!normalizedTracks.some(t=>t.kind===kind))normalizedTracks.push({id:kind+"-1",name:(kind==="video"?"VIDEO ":"AUDIO ")+ "1",kind});
       const rawClips=Array.isArray(p.clips)?p.clips:[];
-      const validClips=rawClips.filter((clip:any)=>clip&&typeof clip.id==="string"&&typeof clip.name==="string"&&typeof clip.path==="string"&&(clip.kind==="video"||clip.kind==="audio")&&Number.isFinite(clip.start)&&clip.start>=0&&Number.isFinite(clip.duration)&&clip.duration>0&&Number.isFinite(clip.sourceStart)&&clip.sourceStart>=0);
+      const validClips=rawClips.filter((clip:any,index:number,all:any[])=>clip&&typeof clip.id==="string"&&typeof clip.name==="string"&&typeof clip.path==="string"&&clip.path.trim().length>0&&(clip.kind==="video"||clip.kind==="audio")&&Number.isFinite(clip.start)&&clip.start>=0&&Number.isFinite(clip.duration)&&clip.duration>0&&Number.isFinite(clip.sourceStart)&&clip.sourceStart>=0&&all.findIndex(other=>other?.id===clip.id)===index);
       if(validClips.length!==rawClips.length)alert("Se omitieron clips dañados o incompletos al abrir el proyecto.");
       const normalizedClips=await mapInBatches(validClips,2,async (clip:any)=>{
         const sourceDuration=Math.max(0.1,Number.isFinite(clip.sourceDuration)&&clip.sourceDuration>0?clip.sourceDuration:clip.sourceStart+clip.duration);
