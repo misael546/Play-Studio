@@ -337,6 +337,7 @@ function App() {
       else if((event.ctrlKey||event.metaKey)&&key==="z"){event.preventDefault();undo();}
       else if((event.ctrlKey||event.metaKey)&&key==="y"){event.preventDefault();redo();}
       else if((event.ctrlKey||event.metaKey)&&key==="n"){event.preventDefault();newProject();}
+      else if((event.ctrlKey||event.metaKey)&&event.shiftKey&&key==="s"){event.preventDefault();void save(true);}
       else if((event.ctrlKey||event.metaKey)&&key==="s"){event.preventDefault();void save();}
       else if((event.ctrlKey||event.metaKey)&&key==="c"){event.preventDefault();copy();}
       else if((event.ctrlKey||event.metaKey)&&key==="v"){event.preventDefault();paste();}
