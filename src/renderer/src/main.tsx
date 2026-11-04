@@ -58,6 +58,7 @@ function App() {
   const pixelsPerSecond = 48 * zoom;
   const previewClips = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>tracks.findIndex(t=>t.id===a.track)-tracks.findIndex(t=>t.id===b.track)||a.start-b.start);
   const previewLayers = previewClips.length ? previewClips : (!playing && active?.kind === "video" ? [active] : []);
+  const previewLayerKey = previewLayers.map(c=>c.id).join("|");
   const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
   const commitClips = (update: Clip[] | ((old:Clip[])=>Clip[])) => {
@@ -209,7 +210,7 @@ function App() {
       if(playing)void video.play().catch(()=>setPlaying(false));
       else video.pause();
     }
-  },[playing,previewLayers]);
+  },[playing,previewLayerKey]);
 
   useEffect(()=>{
     for(const clip of clips.filter(c=>c.kind==="audio")){
