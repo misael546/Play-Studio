@@ -234,6 +234,14 @@ function App() {
     } catch(error) { alert(error instanceof Error?error.message:"No se pudo exportar el video."); }
     finally { stop();setExporting(false);setExportProgress(0); }
   };
+  const fitTimeline = () => {
+    const container=timelineScrollRef.current;
+    if(!container)return;
+    const availableWidth=Math.max(240,container.clientWidth-170);
+    const totalSeconds=Math.max(30,contentDuration);
+    setZoom(Math.max(0.35,Math.min(4,availableWidth/(totalSeconds*48))));
+    container.scrollLeft=0;
+  };
   const time=(seconds:number)=>{const s=Math.max(0,Math.floor(seconds));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
   const togglePlayback=()=>{if(playing){setPlaying(false);return;}if(contentDuration<=0)return;if(playhead>=contentDuration)setPlayhead(0);setPlaying(true);};
 
@@ -428,7 +436,7 @@ function App() {
     </main>
     <section className="timeline">
       <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Imán: alinea clips con el cabezal y otros clips; arrastra bordes para recortar</span></div>
-        <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button></div>
+        <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button><button onClick={fitTimeline} title="Ajustar toda la edición">Ajustar</button></div>
       </div>
       <div className="timeline-scroll" ref={timelineScrollRef}>
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
