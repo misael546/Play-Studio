@@ -188,6 +188,7 @@ function App() {
     try{data=await window.playStudio.loadProject();}
     catch(error){alert(error instanceof Error?"No se pudo abrir el proyecto: "+error.message:"No se pudo abrir el proyecto.");return;}
     if(!data)return;
+    setImporting(true);
     try {
       const p=JSON.parse(data);
       const importedProjectName=typeof p.name==="string"&&p.name.trim()?p.name:"Proyecto importado";
@@ -214,6 +215,7 @@ function App() {
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
       await window.playStudio.acceptLoadedProject();
     } catch { alert("El archivo de proyecto no es válido."); }
+    finally { setImporting(false); }
   };
   const newProject = () => {
     if(clips.length&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
