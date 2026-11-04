@@ -195,10 +195,10 @@ function App() {
           if(c.id!==drag.id)return c;
           if(drag.mode==="move")return {...c,start:movedStart,track:allowedTrack};
           if(drag.mode==="left"){
-            const change=Math.min(drag.clip.duration-0.15,Math.max(-drag.clip.sourceStart,-drag.clip.start,delta));
+            const change=Math.min(drag.clip.duration-0.1,Math.max(-drag.clip.sourceStart,-drag.clip.start,delta));
             return {...c,start:Math.max(0,drag.clip.start+change),sourceStart:drag.clip.sourceStart+change,duration:drag.clip.duration-change};
           }
-          const next=Math.max(0.15,drag.clip.duration+delta);
+          const next=Math.max(0.1,drag.clip.duration+delta);
           return {...c,duration:Math.min(next,drag.clip.sourceDuration-drag.clip.sourceStart)};
         });
       });
