@@ -14,7 +14,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never",
-    "dist:web": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish always"
+    "dist:web": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish always",
+    "dist:web:test": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish never"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -39,7 +40,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "Play-Studio-Setup-${version}.${ext}"
@@ -75,6 +78,10 @@
         "releaseType": "release"
       }
     ],
-    "electronLanguages": ["en-US", "es", "es-419"]
+    "electronLanguages": [
+      "en-US",
+      "es",
+      "es-419"
+    ]
   }
 }
