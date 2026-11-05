@@ -4,6 +4,7 @@ import type { MediaItem, ExportClip, ExportRequest } from "../../preload";
 import "./style.css";
 
 type Track = { id: string; name: string; kind: "video" | "audio" };
+type EditSnapshot = { clips: Clip[]; tracks: Track[] };
 type Clip = MediaItem & { waveform?: number[]; thumbnail?: string; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
 declare global {
@@ -65,8 +66,8 @@ async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: 
 const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,thumbnail,...clip})=>clip)});
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
-  const [undoStack, setUndoStack] = useState<Clip[][]>([]);
-  const [redoStack, setRedoStack] = useState<Clip[][]>([]);
+  const [undoStack, setUndoStack] = useState<EditSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<EditSnapshot[]>([]);
   const [tracks, setTracks] = useState<Track[]>([{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
   const [selected, setSelected] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<Clip | null>(null);
@@ -100,17 +101,35 @@ function App() {
   const previewLayerKey = previewLayers.map(c=>c.id).join("|");
   const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
+  const recordHistory = () => {
+    setUndoStack(old=>[...old,{clips,tracks}].slice(-60));
+    setRedoStack([]);
+  };
   const commitClips = (update: Clip[] | ((old:Clip[])=>Clip[])) => {
     const next = typeof update === "function" ? update(clips) : update;
-    setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);setClips(next);
+    recordHistory();
+    setClips(next);
+  };
+  const commitTracks = (update: Track[] | ((old:Track[])=>Track[])) => {
+    const next = typeof update === "function" ? update(tracks) : update;
+    recordHistory();
+    setTracks(next);
   };
   const undo = () => {
     if(!undoStack.length)return;
-    setRedoStack(old=>[...old,clips]);setClips(undoStack[undoStack.length-1]);setUndoStack(old=>old.slice(0,-1));
+    const previous=undoStack[undoStack.length-1];
+    setRedoStack(old=>[...old,{clips,tracks}].slice(-60));
+    setClips(previous.clips);
+    setTracks(previous.tracks);
+    setUndoStack(old=>old.slice(0,-1));
   };
   const redo = () => {
     if(!redoStack.length)return;
-    setUndoStack(old=>[...old,clips]);setClips(redoStack[redoStack.length-1]);setRedoStack(old=>old.slice(0,-1));
+    const next=redoStack[redoStack.length-1];
+    setUndoStack(old=>[...old,{clips,tracks}].slice(-60));
+    setClips(next.clips);
+    setTracks(next.tracks);
+    setRedoStack(old=>old.slice(0,-1));
   };
 
   const addMedia = async () => {
@@ -191,25 +210,25 @@ function App() {
   const cut = () => { if (active) { setClipboard({...active});remove(); } };
   const addTrack = (kind:"video"|"audio") => {
     const count=tracks.filter(t=>t.kind===kind).length+1;
-    setTracks(old=>[...old,{id:crypto.randomUUID(),name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
+    commitTracks(old=>[...old,{id:crypto.randomUUID(),name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
   };
   const renameTrack = (track:Track) => {
     const name=window.prompt("Nuevo nombre para la pista:",track.name);
     if(name===null)return;
     const cleanName=name.trim().slice(0,32);
     if(!cleanName){alert("El nombre de la pista no puede estar vacío.");return;}
-    setTracks(old=>old.map(item=>item.id===track.id?{...item,name:cleanName}:item));
+    commitTracks(old=>old.map(item=>item.id===track.id?{...item,name:cleanName}:item));
   };
   const moveTrack = (index:number,direction:-1|1) => {
     const target=index+direction;
     if(target<0||target>=tracks.length)return;
-    setTracks(old=>{const next=[...old];[next[index],next[target]]=[next[target],next[index]];return next;});
+    commitTracks(old=>{const next=[...old];[next[index],next[target]]=[next[target],next[index]];return next;});
   };
   const deleteTrack = (track:Track) => {
     if(clips.some(clip=>clip.track===track.id)){alert("La pista contiene clips. Mueve o elimina esos clips antes de borrar la pista.");return;}
     if(tracks.filter(item=>item.kind===track.kind).length<=1){alert("Debe quedar al menos una pista de "+(track.kind==="video"?"video":"audio")+".");return;}
     if(!window.confirm("¿Eliminar la pista vacía \""+track.name+"\"?"))return;
-    setTracks(old=>old.filter(item=>item.id!==track.id));
+    commitTracks(old=>old.filter(item=>item.id!==track.id));
   };
   const save = async (saveAs = false) => {
     try{
@@ -516,11 +535,11 @@ function App() {
               const waveEnd=c.sourceDuration>0?Math.ceil((c.sourceStart+c.duration)/c.sourceDuration*sourceWaveform.length):sourceWaveform.length;
               const visibleWaveform=sourceWaveform.slice(waveStart,Math.max(waveStart+1,waveEnd));
               return <div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
-                {c.kind==="video"&&c.thumbnail&&<img className="timeline-clip-thumbnail" src={c.thumbnail} alt="" draggable={false}/>}<span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
+                {c.kind==="video"&&c.thumbnail&&<img className="timeline-clip-thumbnail" src={c.thumbnail} alt="" draggable={false}/>}<span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);recordHistory();dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
                 <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
                 {track.kind==="audio"&&visibleWaveform.length>0&&<div className="clip-waveform">{visibleWaveform.map((peak,index)=><i key={index} style={{height:Math.max(2,peak*100)+"%"}}/>)}</div>}
-                <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
-                <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
+                <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);recordHistory();dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>
+                <span className="move-surface" onPointerDown={e=>{e.stopPropagation();setSelected(c.id);recordHistory();dragRef.current={id:c.id,mode:"move",x:e.clientX,clip:{...c}};}}/>
               </div>;
             })}
           </div>
