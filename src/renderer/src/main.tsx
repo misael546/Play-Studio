@@ -70,7 +70,26 @@ async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: 
   return results;
 }
 const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,thumbnail,previewUrl,...clip})=>clip)});
-function App() {\n  const [appVersion,setAppVersion] = useState("…");\n  const [diagnosticsOpen,setDiagnosticsOpen] = useState(false);\n  const [diagnosticsText,setDiagnosticsText] = useState("");\n  const [diagnosticsCount,setDiagnosticsCount] = useState(0);\n  useEffect(() => { void window.playStudio.getAppVersion().then(setAppVersion).catch(() => setAppVersion("desconocida")); }, []);\n  useEffect(() => {\n    const report = (source:string, value:unknown) => {\n      const message = value instanceof Error ? (value.stack || value.message) : String(value);\n      setDiagnosticsCount(count=>count+1);\n      void window.playStudio.writeDiagnostic(source,message).catch(()=>{});\n    };\n    const onError = (event:ErrorEvent) => report("RENDERER / ERROR", event.error || event.message);\n    const onRejection = (event:PromiseRejectionEvent) => report("RENDERER / PROMESA NO CONTROLADA", event.reason);\n    window.addEventListener("error",onError);\n    window.addEventListener("unhandledrejection",onRejection);\n    return () => { window.removeEventListener("error",onError); window.removeEventListener("unhandledrejection",onRejection); };\n  }, []);\n  const openDiagnostics = async () => { setDiagnosticsOpen(true); try { setDiagnosticsText(await window.playStudio.readDiagnostics()); } catch(error) { setDiagnosticsText("No se pudo leer el registro: "+String(error)); } };\n  const copyDiagnostics = async () => { try { await navigator.clipboard.writeText(diagnosticsText || "No hay errores registrados."); } catch { setDiagnosticsText(old=>old+"\\nNo se pudo copiar automáticamente. Selecciona el texto y cópialo manualmente."); } };
+function App() {
+  const [appVersion,setAppVersion] = useState("…");
+  const [diagnosticsOpen,setDiagnosticsOpen] = useState(false);
+  const [diagnosticsText,setDiagnosticsText] = useState("");
+  const [diagnosticsCount,setDiagnosticsCount] = useState(0);
+  useEffect(() => { void window.playStudio.getAppVersion().then(setAppVersion).catch(() => setAppVersion("desconocida")); }, []);
+  useEffect(() => {
+    const report = (source:string, value:unknown) => {
+      const message = value instanceof Error ? (value.stack || value.message) : String(value);
+      setDiagnosticsCount(count=>count+1);
+      void window.playStudio.writeDiagnostic(source,message).catch(()=>{});
+    };
+    const onError = (event:ErrorEvent) => report("RENDERER / ERROR", event.error || event.message);
+    const onRejection = (event:PromiseRejectionEvent) => report("RENDERER / PROMESA NO CONTROLADA", event.reason);
+    window.addEventListener("error",onError);
+    window.addEventListener("unhandledrejection",onRejection);
+    return () => { window.removeEventListener("error",onError); window.removeEventListener("unhandledrejection",onRejection); };
+  }, []);
+  const openDiagnostics = async () => { setDiagnosticsOpen(true); try { setDiagnosticsText(await window.playStudio.readDiagnostics()); } catch(error) { setDiagnosticsText("No se pudo leer el registro: "+String(error)); } };
+  const copyDiagnostics = async () => { try { await navigator.clipboard.writeText(diagnosticsText || "No hay errores registrados."); } catch { setDiagnosticsText(old=>old+"\\nNo se pudo copiar automáticamente. Selecciona el texto y cópialo manualmente."); } };
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<EditSnapshot[]>([]);
   const [redoStack, setRedoStack] = useState<EditSnapshot[]>([]);
