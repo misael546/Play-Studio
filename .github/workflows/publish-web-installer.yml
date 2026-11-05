@@ -1,19 +1,19 @@
-name: Publish Play Studio Web Installer
+name: Build Play Studio Lightweight Web Installer
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: play-studio-release-${{ github.ref }}
-  cancel-in-progress: false
+  group: play-studio-web-installer-test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  publish-web-installer:
+  build-web-installer:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -27,18 +27,25 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build and publish web installer
-        run: npm run dist:web
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build lightweight installer without publishing
+        run: npm run dist:web:test
 
-      - name: Upload installer files as workflow artifact
+      - name: Verify web installer outputs
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release -Filter *.exe -File
+          $payload = Get-ChildItem release -Filter *.7z -File
+          if (-not $exe) { throw "No se genero el instalador web .exe" }
+          if (-not $payload) { throw "No se genero el paquete descargable .7z" }
+          Get-ChildItem release -File | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: Upload verified web installer test artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Play-Studio-Web-Installer
+          name: Play-Studio-Lightweight-Web-Installer-Test
           path: |
             release/*.exe
             release/*.7z
             release/*.yml
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
