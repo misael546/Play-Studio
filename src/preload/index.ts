@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 export type MediaItem = { id: string; name: string; path: string; url: string; kind: "video" | "audio"; size: number };
 export type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom"; rotation?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; effect?: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 export type ExportRequest = { clips: ExportClip[]; resolution: "720p" | "1080p" | "4k"; fps: 24 | 30 | 60 };
-contextBridge.exposeInMainWorld("playStudio", {\n  getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:version"),
+contextBridge.exposeInMainWorld("playStudio", {
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:version"),
   writeDiagnostic: (source: string, message: string): Promise<boolean> => ipcRenderer.invoke("diagnostics:write", source, message),
   readDiagnostics: (): Promise<string> => ipcRenderer.invoke("diagnostics:read"),
   clearDiagnostics: (): Promise<boolean> => ipcRenderer.invoke("diagnostics:clear"),
