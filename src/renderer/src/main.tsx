@@ -116,8 +116,8 @@ function App() {
   const duration = Math.max(30, contentDuration);
   const pixelsPerSecond = 48 * zoom;
   const previewClips = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>tracks.findIndex(t=>t.id===a.track)-tracks.findIndex(t=>t.id===b.track)||a.start-b.start);
-  const fallbackVideo = clips.filter(c=>c.kind==="video"&&c.start<=playhead).sort((a,b)=>b.start-a.start)[0];
-  const previewLayers = previewClips.length ? previewClips : (!playing && active?.kind === "video" ? [active] : fallbackVideo ? [fallbackVideo] : []);
+  const fallbackVideo = clips.filter(c=>c.kind==="video").sort((a,b)=>Math.abs(a.start-playhead)-Math.abs(b.start-playhead))[0];
+  const previewLayers = previewClips.length ? previewClips : (active?.kind === "video" ? [active] : fallbackVideo ? [fallbackVideo] : []);
   const previewLayerKey = previewLayers.map(c=>c.id).join("|");
   const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
