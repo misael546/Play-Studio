@@ -81,12 +81,13 @@ app.whenReady().then(() => {
       const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
       const ext = name.split(".").pop()?.toLowerCase() ?? "";
       const audio = ["mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"].includes(ext);
-      return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind: audio ? "audio" : "video", size: info.size };
+      const image = ["png","jpg","jpeg","gif","webp","bmp","tif","tiff"].includes(ext);
+      return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind: audio ? "audio" : "video", size: info.size, isImage: image };
     }));
   });
   ipcMain.handle("media:relink", async (_event, kind: "video" | "audio") => {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [
-      { name: kind === "audio" ? "Archivos de audio" : "Archivos de video", extensions: kind === "audio" ? ["mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"] : ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob"] },
+      { name: kind === "audio" ? "Archivos de audio" : "Archivos de video", extensions: kind === "audio" ? ["mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"] : ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob","png","jpg","jpeg","gif","webp","bmp","tif","tiff"] },
       { name: "Todos los archivos", extensions: ["*"] }
     ]});
     if (result.canceled || !result.filePaths[0]) return null;
@@ -376,7 +377,12 @@ app.whenReady().then(() => {
     const [width,height] = dimensions[request.resolution ?? "1080p"] ?? dimensions["1080p"];
     const fps = [24,30,60].includes(request.fps ?? 30) ? (request.fps ?? 30) : 30;
     const args: string[] = ["-y"];
-    safeClips.forEach(c => args.push("-i", c.path));
+    safeClips.forEach(c => {
+      const ext = c.path.split(".").pop()?.toLowerCase() ?? "";
+      const stillImage = ["png","jpg","jpeg","gif","webp","bmp","tif","tiff"].includes(ext);
+      if (stillImage) args.push("-loop", "1", "-t", c.duration.toFixed(3), "-i", c.path);
+      else args.push("-i", c.path);
+    });
     const filters: string[] = [];
     filters.push("color=c=black:s="+width+"x"+height+":r="+fps+":d=" + totalDuration.toFixed(3) + "[base0]");
     let base = "base0";
