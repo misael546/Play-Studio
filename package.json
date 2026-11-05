@@ -15,12 +15,14 @@
     "typecheck": "tsc --noEmit",
     "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never",
     "dist:web": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish always",
-    "dist:web:test": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish never"
+    "dist:web:test": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish never",
+    "dist:publish": "npm run typecheck && npm run build && electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "ffmpeg-static": "^5.2.0"
+    "ffmpeg-static": "^5.2.0",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
