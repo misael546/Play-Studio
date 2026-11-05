@@ -1,6 +1,6 @@
 {
   "name": "play-studio",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Editor de video de escritorio para Windows",
   "repository": {
@@ -86,4 +86,4 @@
       "es-419"
     ]
   }
-}
+}\n
