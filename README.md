@@ -48,11 +48,19 @@ npm install
 npm run dev
 ```
 
-## Crear instalador
+## Crear instaladores
+
+Instalador completo (incluye todos los archivos; funciona sin conexión durante la instalación):
 ```bash
 npm run dist
 ```
-El instalador NSIS se genera en la carpeta `release`.
+
+Instalador web ligero (requiere conexión a Internet y descarga el paquete completo durante la instalación):
+```bash
+GH_TOKEN=TOKEN_DE_GITHUB npm run dist:web
+```
+
+El instalador web se publica en GitHub Releases junto con el paquete de aplicación y sus metadatos de integridad. En GitHub Actions, el flujo `Publish Play Studio Web Installer` se ejecuta al publicar una etiqueta `v*` y utiliza `GITHUB_TOKEN` automáticamente. La instalación completa conserva Electron, FFmpeg y todas las dependencias; solo se reduce el tamaño del primer `.exe`, no el tamaño final instalado.
 
 ## Nota técnica
 Esta versión incluye el motor inicial de exportación MP4, fundidos, títulos, ajustes básicos de imagen, mezcla de audio original y pistas independientes. Las transiciones avanzadas entre clips y las pruebas de uso real siguen pendientes. El respaldo automático crea una copia de recuperación local después de las modificaciones.
