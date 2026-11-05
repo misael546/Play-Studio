@@ -13,7 +13,7 @@ let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
 let autosaveQueue: Promise<void> = Promise.resolve();
 
-type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
+type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom"; rotation?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; effect?: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
@@ -284,7 +284,11 @@ app.whenReady().then(() => {
         saturation: boundedNumber(clip.saturation, 1, 0, 2),
         title: typeof clip.title === "string" ? clip.title.slice(0, 120) : "",
         titleSize: boundedNumber(clip.titleSize, 48, 12, 160),
-        titlePosition: ["top", "center", "bottom"].includes(clip.titlePosition ?? "bottom") ? (clip.titlePosition ?? "bottom") : "bottom"
+        titlePosition: ["top", "center", "bottom"].includes(clip.titlePosition ?? "bottom") ? (clip.titlePosition ?? "bottom") : "bottom",
+        rotation: ([0, 90, 180, 270].includes(clip.rotation ?? 0) ? clip.rotation : 0) as 0 | 90 | 180 | 270,
+        flipHorizontal: clip.flipHorizontal === true,
+        flipVertical: clip.flipVertical === true,
+        effect: (["none", "grayscale", "sepia", "blur", "sharpen"].includes(clip.effect ?? "none") ? clip.effect : "none") as ExportClip["effect"]
       });
     }
     if (!safeClips.length) throw new Error("No hay clips válidos para exportar.");
@@ -317,7 +321,7 @@ app.whenReady().then(() => {
       const inputIndex = safeClips.indexOf(clip);
       const label = "v" + index;
       const next = "base" + (index + 1);
-      const videoFilters = ["trim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"setpts=PTS-STARTPTS","scale="+width+":"+height+":force_original_aspect_ratio=decrease","pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2","setsar=1","fps="+fps,"format=rgba","eq=brightness="+Math.max(-1,Math.min(1,clip.brightness??0)).toFixed(2)+":contrast="+Math.max(0,Math.min(3,clip.contrast??1)).toFixed(2)+":saturation="+Math.max(0,Math.min(3,clip.saturation??1)).toFixed(2)];
+      const videoFilters = ["trim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"setpts=PTS-STARTPTS",...(clip.rotation===90?["transpose=1"]:clip.rotation===180?["hflip","vflip"]:clip.rotation===270?["transpose=2"]:[]),...(clip.flipHorizontal?["hflip"]:[]),...(clip.flipVertical?["vflip"]:[]),"scale="+width+":"+height+":force_original_aspect_ratio=decrease","pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2","setsar=1","fps="+fps,"format=rgba","eq=brightness="+Math.max(-1,Math.min(1,clip.brightness??0)).toFixed(2)+":contrast="+Math.max(0,Math.min(3,clip.contrast??1)).toFixed(2)+":saturation="+Math.max(0,Math.min(3,clip.saturation??1)).toFixed(2),...(clip.effect==="grayscale"?["hue=s=0"]:clip.effect==="sepia"?["colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"]:clip.effect==="blur"?["boxblur=2:1"]:clip.effect==="sharpen"?["unsharp=5:5:0.8:3:3:0.4"]:[])];
       const fadeIn=Math.max(0,Math.min(clip.duration,clip.fadeIn??0));
       const fadeOut=Math.max(0,Math.min(clip.duration,clip.fadeOut??0));
       if(fadeIn>0)videoFilters.push("fade=t=in:st=0:d="+fadeIn.toFixed(3)+":alpha=1");
