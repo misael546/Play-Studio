@@ -13,7 +13,7 @@ let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
 let autosaveQueue: Promise<void> = Promise.resolve();
 
-type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
+type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 const escapeFilterText = (value: string) => value.replace(/\\/g,"\\\\").replace(/:/g,"\\:").replace(/;/g,"\\;").replace(/\r?\n/g," ").replace(/'/g,"\\'").replace(/%/g,"\\%").replace(/,/g,"\\,").replace(/\[/g,"\\[").replace(/\]/g,"\\]");
@@ -274,6 +274,7 @@ app.whenReady().then(() => {
         ...clip,
         trackOrder: boundedNumber(clip.trackOrder, 0, 0, 1000),
         volume: boundedNumber(clip.volume, 1, 0, 2),
+        audioMuted: clip.audioMuted === true,
         fadeIn: boundedNumber(clip.fadeIn, 0, 0, clip.duration),
         fadeOut: boundedNumber(clip.fadeOut, 0, 0, clip.duration),
         brightness: boundedNumber(clip.brightness, 0, -0.5, 0.5),
@@ -335,7 +336,7 @@ app.whenReady().then(() => {
       audioSources.forEach((clip, index) => {
         const inputIndex = safeClips.indexOf(clip);
         const delay = Math.max(0, Math.round(clip.start * 1000));
-        const audioFilters=["atrim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"asetpts=PTS-STARTPTS","volume="+Math.max(0,Math.min(2,clip.volume??1)).toFixed(2)];
+        const audioFilters=["atrim=start="+clip.sourceStart.toFixed(3)+":duration="+clip.duration.toFixed(3),"asetpts=PTS-STARTPTS","volume="+(clip.audioMuted?0:Math.max(0,Math.min(2,clip.volume??1))).toFixed(2)];
         const fadeIn=Math.max(0,Math.min(clip.duration,clip.fadeIn??0));
         const fadeOut=Math.max(0,Math.min(clip.duration,clip.fadeOut??0));
         if(fadeIn>0)audioFilters.push("afade=t=in:st=0:d="+fadeIn.toFixed(3));

@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { MediaItem, ExportClip, ExportRequest } from "../../preload";
 import "./style.css";
 
-type Track = { id: string; name: string; kind: "video" | "audio" };
+type Track = { id: string; name: string; kind: "video" | "audio"; muted?: boolean; solo?: boolean };
 type EditSnapshot = { clips: Clip[]; tracks: Track[] };
 type Clip = MediaItem & { waveform?: number[]; thumbnail?: string; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
@@ -107,6 +107,7 @@ function App() {
   const previewLayerKey = previewLayers.map(c=>c.id).join("|");
   const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
+  const audioSoloActive = tracks.some(track => track.kind === "audio" && track.solo === true);
   const recordHistory = () => {
     setUndoStack(old=>[...old,{clips,tracks}].slice(-60));
     setRedoStack([]);
@@ -330,7 +331,11 @@ function App() {
     setExporting(true);setExportProgress(0);
     const stop=window.playStudio.onExportProgress(setExportProgress);
     try {
-      const payload:ExportClip[]=clips.map(c=>({path:c.path,kind:c.kind,start:c.start,sourceStart:c.sourceStart,duration:c.duration,trackOrder:tracks.findIndex(t=>t.id===c.track),volume:c.volume,fadeIn:c.fadeIn,fadeOut:c.fadeOut,brightness:c.brightness,contrast:c.contrast,saturation:c.saturation,title:c.title,titleSize:c.titleSize,titlePosition:c.titlePosition}));
+      const payload:ExportClip[]=clips.map(c=>{
+        const track=tracks.find(item=>item.id===c.track);
+        const audioMuted=track?.muted===true||(c.kind==="video"&&audioSoloActive)||(c.kind==="audio"&&audioSoloActive&&track?.solo!==true);
+        return {path:c.path,kind:c.kind,start:c.start,sourceStart:c.sourceStart,duration:c.duration,trackOrder:tracks.findIndex(t=>t.id===c.track),volume:c.volume,audioMuted,fadeIn:c.fadeIn,fadeOut:c.fadeOut,brightness:c.brightness,contrast:c.contrast,saturation:c.saturation,title:c.title,titleSize:c.titleSize,titlePosition:c.titlePosition};
+      });
       const request:ExportRequest={clips:payload,resolution,fps};
       const result=await window.playStudio.exportVideo(request);
       if(!result.canceled) alert("Exportación terminada.\n"+result.path);
@@ -340,7 +345,7 @@ function App() {
   const fitTimeline = () => {
     const container=timelineScrollRef.current;
     if(!container)return;
-    const availableWidth=Math.max(240,container.clientWidth-170);
+    const availableWidth=Math.max(240,container.clientWidth-220);
     const totalSeconds=contentDuration>0?contentDuration:30;
     setZoom(Math.max(0.35,Math.min(4,availableWidth/(totalSeconds*48))));
     container.scrollLeft=0;
@@ -429,9 +434,11 @@ function App() {
     for(const clip of previewLayers){
       const video=videoRefs.current[clip.id];if(!video)continue;
       const elapsed=Math.min(clip.duration,Math.max(0,playhead-clip.start));
-      video.volume=Math.min(1,Math.max(0,clip.volume*fadeGain(clip,elapsed)));
+      const track=tracks.find(item=>item.id===clip.track);
+      const muted=track?.muted===true||audioSoloActive;
+      video.volume=muted?0:Math.min(1,Math.max(0,clip.volume*fadeGain(clip,elapsed)));
     }
-  },[previewLayers,playhead]);
+  },[previewLayers,playhead,tracks,audioSoloActive]);
 
   useEffect(()=>{
     for(const clip of previewLayers){
@@ -453,7 +460,9 @@ function App() {
   useEffect(()=>{
     for(const clip of clips.filter(c=>c.kind==="audio")){
       const audio=audioRefs.current[clip.id];if(!audio)continue;
-      const inRange=playing&&playhead>=clip.start&&playhead<clip.start+clip.duration;
+      const track=tracks.find(item=>item.id===clip.track);
+      const audible=track?.muted!==true&&(!audioSoloActive||track?.solo===true);
+      const inRange=playing&&audible&&playhead>=clip.start&&playhead<clip.start+clip.duration;
       if(inRange){
         const wanted=clip.sourceStart+(playhead-clip.start);
         if(audio.paused||Math.abs(audio.currentTime-wanted)>0.3){try{audio.currentTime=wanted;}catch{}}
@@ -462,7 +471,7 @@ function App() {
         if(audio.paused)void audio.play().catch(()=>{});
       }else audio.pause();
     }
-  },[clips,playhead,playing]);
+  },[clips,playhead,playing,tracks,audioSoloActive]);
 
   useEffect(()=>{
     if(!playing)return;
@@ -492,10 +501,10 @@ function App() {
     if(!playing)return;
     const container=timelineScrollRef.current;
     if(!container)return;
-    const playheadX=150+playhead*pixelsPerSecond;
-    const visibleLeft=container.scrollLeft+170;
+    const playheadX=200+playhead*pixelsPerSecond;
+    const visibleLeft=container.scrollLeft+220;
     const visibleRight=container.scrollLeft+container.clientWidth-100;
-    if(playheadX<visibleLeft)container.scrollLeft=Math.max(0,playheadX-170);
+    if(playheadX<visibleLeft)container.scrollLeft=Math.max(0,playheadX-220);
     else if(playheadX>visibleRight)container.scrollLeft=Math.max(0,playheadX-container.clientWidth*0.75);
   },[playhead,playing,pixelsPerSecond]);
 
@@ -574,6 +583,10 @@ function App() {
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
         {tracks.map((track,trackIndex)=><div className="track-row" key={track.id}>
           <div className="track-label" style={{display:"flex",alignItems:"center",gap:4,padding:"0 6px"}}>
+            {track.kind==="audio"&&<>
+              <button className={track.muted?"track-toggle on":"track-toggle"} title={track.muted?"Activar audio":"Silenciar pista"} aria-label={track.muted?"Activar audio":"Silenciar pista"} aria-pressed={track.muted===true} onClick={()=>commitTracks(old=>old.map(item=>item.id===track.id?{...item,muted:!item.muted}:item))}>M</button>
+              <button className={track.solo?"track-toggle solo on":"track-toggle solo"} title={track.solo?"Desactivar solo":"Escuchar solo esta pista"} aria-label={track.solo?"Desactivar solo":"Escuchar solo esta pista"} aria-pressed={track.solo===true} onClick={()=>commitTracks(old=>old.map(item=>item.id===track.id?{...item,solo:!item.solo}:item))}>S</button>
+            </>}
             <span title={track.name} style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{track.name}</span>
             <button title="Renombrar pista" aria-label={"Renombrar "+track.name} onClick={()=>renameTrack(track)} style={{padding:"3px 4px",fontSize:11}}>✎</button>
             <button title="Subir pista" aria-label={"Subir "+track.name} disabled={trackIndex===0} onClick={()=>moveTrack(trackIndex,-1)} style={{padding:"3px 4px",fontSize:11}}>↑</button>
@@ -596,7 +609,7 @@ function App() {
             })}
           </div>
         </div>)}
-        <div className="playhead" style={{left:150+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
+        <div className="playhead" style={{left:200+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
       </div>
       <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover o soltar en otra pista · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
