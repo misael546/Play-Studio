@@ -29,8 +29,10 @@ declare global {
     };
   }
 }
+const isImageMedia = (path: string) => /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i.test(path);
 const makeMediaUrl = (path: string) => "media://local/" + btoa(unescape(encodeURIComponent(path))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const readDuration = async (item: MediaItem): Promise<number> => {
+  if (isImageMedia(item.path)) return 5;
   const browserDuration = await new Promise<number>(resolve => {
     const element = document.createElement(item.kind === "audio" ? "audio" : "video");
     let settled = false;
@@ -112,7 +114,8 @@ function App() {
   const duration = Math.max(30, contentDuration);
   const pixelsPerSecond = 48 * zoom;
   const previewClips = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>tracks.findIndex(t=>t.id===a.track)-tracks.findIndex(t=>t.id===b.track)||a.start-b.start);
-  const previewLayers = previewClips.length ? previewClips : (!playing && active?.kind === "video" ? [active] : []);
+  const fallbackVideo = clips.filter(c=>c.kind==="video"&&c.start<=playhead).sort((a,b)=>b.start-a.start)[0];
+  const previewLayers = previewClips.length ? previewClips : (!playing && active?.kind === "video" ? [active] : fallbackVideo ? [fallbackVideo] : []);
   const previewLayerKey = previewLayers.map(c=>c.id).join("|");
   const previewClip = previewLayers[previewLayers.length-1];
   const selectedTrack = tracks.find(t => t.id === active?.track);
@@ -158,8 +161,8 @@ function App() {
           const mediaDuration=await readDuration(item);
           const [waveform,thumbnail,previewUrl]=await Promise.all([
             item.kind==="audio"&&mediaDuration>0?window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
-            item.kind==="video"&&mediaDuration>0?window.playStudio.getThumbnail(item.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null),
-            item.kind==="video"&&mediaDuration>0?window.playStudio.getPreviewVideo(item.path).catch(()=>undefined):Promise.resolve(undefined)
+            item.kind==="video"&&mediaDuration>0?(isImageMedia(item.path)?Promise.resolve(item.url):window.playStudio.getThumbnail(item.path,Math.min(1,mediaDuration/2)).catch(()=>null)):Promise.resolve(null),
+            item.kind==="video"&&mediaDuration>0&&!isImageMedia(item.path)?window.playStudio.getPreviewVideo(item.path).catch(()=>undefined):Promise.resolve(undefined)
           ]);
           return {...item,mediaDuration,waveform,thumbnail:thumbnail??undefined,previewUrl};
         });
@@ -278,8 +281,8 @@ function App() {
         const savedWaveform=Array.isArray(clip.waveform)?clip.waveform.filter((peak:any)=>Number.isFinite(peak)).slice(0,180).map((peak:number)=>Math.max(0,Math.min(1,peak))):[];
         const [waveform,thumbnail,previewUrl]=await Promise.all([
           clip.kind==="audio"?(savedWaveform.length?Promise.resolve(savedWaveform):window.playStudio.getWaveform(clip.path,sourceDuration).catch(()=>[])):Promise.resolve(undefined),
-          clip.kind==="video"?window.playStudio.getThumbnail(clip.path,Math.min(1,sourceDuration/2)).catch(()=>null):Promise.resolve(null),
-          clip.kind==="video"?window.playStudio.getPreviewVideo(clip.path).catch(()=>undefined):Promise.resolve(undefined)
+          clip.kind==="video"?(isImageMedia(clip.path)?Promise.resolve(makeMediaUrl(clip.path)):window.playStudio.getThumbnail(clip.path,Math.min(1,sourceDuration/2)).catch(()=>null)):Promise.resolve(null),
+          clip.kind==="video"&&!isImageMedia(clip.path)?window.playStudio.getPreviewVideo(clip.path).catch(()=>undefined):Promise.resolve(undefined)
         ]);
         return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,previewUrl,thumbnail:thumbnail??undefined,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",rotation:([0,90,180,270].includes(clip.rotation)?clip.rotation:0) as 0|90|180|270,flipHorizontal:clip.flipHorizontal===true,flipVertical:clip.flipVertical===true,effect:(["none","grayscale","sepia","blur","sharpen"].includes(clip.effect)?clip.effect:"none") as Clip["effect"],url:makeMediaUrl(clip.path)} as Clip;
       });
@@ -558,13 +561,13 @@ function App() {
     <main className="workspace">
       <aside className="media-panel">
         <div className="panel-heading"><b>MEDIOS DEL PROYECTO</b><button className="plus" onClick={addMedia}>＋</button></div>
-        <button className="add-media" onClick={addMedia}>＋ Añadir video o audio</button>
+        <button className="add-media" onClick={addMedia}>＋ Añadir video, audio o imagen</button>
         <div className="media-list">{mediaLibrary.map(c=><button key={c.path} className={"media-item "+(active?.path.toLowerCase()===c.path.toLowerCase()?"active":"")} onClick={()=>{setSelected(c.id);setPlayhead(c.start);setPlaying(false);}}><span className="media-thumb">{c.kind==="video"&&c.thumbnail?<img src={c.thumbnail} alt="" />:<span className="media-icon">{c.kind==="audio"?"♫":"▣"}</span>}</span><span>{c.name}</span></button>)}</div>
-        <div className="panel-footer">Importa MP4, MOV, MKV, MP3, WAV y más formatos</div>
+        <div className="panel-footer">Importa videos, audios e imágenes (MP4, MOV, MP3, WAV, JPG, PNG y más)</div>
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.previewUrl??clip.url} poster={clip.thumbnail} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%) ${clip.effect==="grayscale"?"grayscale(1)":clip.effect==="sepia"?"sepia(1)":clip.effect==="blur"?"blur(2px)":clip.effect==="sharpen"?"contrast(1.12)":" "}`,transform:`rotate(${clip.rotation}deg) scaleX(${clip.flipHorizontal?-1:1}) scaleY(${clip.flipVertical?-1:1})`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onError={()=>setPreviewErrors(old=>({...old,[clip.id]:"No se pudo preparar una versión compatible de este video para la vista previa."}))} onLoadedMetadata={e=>{setPreviewErrors(old=>{if(!old[clip.id])return old;const next={...old};delete next[clip.id];return next;});const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}{previewLayers.some(layer=>previewErrors[layer.id])&&<div className="preview-error"><b>No se puede mostrar este video</b><span>{previewErrors[previewLayers.find(layer=>previewErrors[layer.id])!.id]}</span><small>La vista previa se prepara automáticamente con FFmpeg. Comprueba que el archivo no esté dañado y vuelve a importarlo si el error continúa.</small></div>}</div>:active?.kind==="audio"&&previewErrors[active.id]?<div className="empty-preview media-preview-error"><b>No se puede reproducir este audio</b><span>{previewErrors[active.id]}</span><small>Prueba convertirlo a MP3 o WAV para escuchar la vista previa.</small></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}>{isImageMedia(clip.path)?<img src={clip.url} alt={clip.name} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,transform:`rotate(${clip.rotation}deg) scaleX(${clip.flipHorizontal?-1:1}) scaleY(${clip.flipVertical?-1:1})`,zIndex:tracks.findIndex(t=>t.id===clip.track)+1}}/>:<video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.previewUrl??clip.url} poster={clip.thumbnail} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%) ${clip.effect==="grayscale"?"grayscale(1)":clip.effect==="sepia"?"sepia(1)":clip.effect==="blur"?"blur(2px)":clip.effect==="sharpen"?"contrast(1.12)":" "}`,transform:`rotate(${clip.rotation}deg) scaleX(${clip.flipHorizontal?-1:1}) scaleY(${clip.flipVertical?-1:1})`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onError={()=>setPreviewErrors(old=>({...old,[clip.id]:"No se pudo preparar una versión compatible de este video para la vista previa."}))} onLoadedMetadata={e=>{setPreviewErrors(old=>{if(!old[clip.id])return old;const next={...old};delete next[clip.id];return next;});const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />}{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}{previewLayers.some(layer=>previewErrors[layer.id])&&<div className="preview-error"><b>No se puede mostrar este video</b><span>{previewErrors[previewLayers.find(layer=>previewErrors[layer.id])!.id]}</span><small>La vista previa se prepara automáticamente con FFmpeg. Comprueba que el archivo no esté dañado y vuelve a importarlo si el error continúa.</small></div>}</div>:active?.kind==="audio"&&previewErrors[active.id]?<div className="empty-preview media-preview-error"><b>No se puede reproducir este audio</b><span>{previewErrors[active.id]}</span><small>Prueba convertirlo a MP3 o WAV para escuchar la vista previa.</small></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
@@ -598,7 +601,7 @@ function App() {
       <div className="timeline-scroll" ref={timelineScrollRef}>
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
         {tracks.map((track,trackIndex)=><div className="track-row" key={track.id}>
-          <div className="track-label" style={{display:"flex",alignItems:"center",gap:4,padding:"0 6px"}}>
+          <div className="track-label" onContextMenu={e=>{e.preventDefault();moveTrack(trackIndex,e.shiftKey?-1:1);}} title="Clic derecho: bajar pista · Shift + clic derecho: subir pista" style={{display:"flex",alignItems:"center",gap:4,padding:"0 6px"}}>
             <button className={track.muted?"track-toggle on":"track-toggle"} title={track.muted?"Activar audio":"Silenciar pista"} aria-label={track.muted?"Activar audio":"Silenciar pista"} aria-pressed={track.muted===true} onClick={()=>commitTracks(old=>old.map(item=>item.id===track.id?{...item,muted:!item.muted}:item))}>M</button>
             {track.kind==="audio"&&<button className={track.solo?"track-toggle solo on":"track-toggle solo"} title={track.solo?"Desactivar solo":"Escuchar solo esta pista"} aria-label={track.solo?"Desactivar solo":"Escuchar solo esta pista"} aria-pressed={track.solo===true} onClick={()=>commitTracks(old=>old.map(item=>item.id===track.id?{...item,solo:!item.solo}:item))}>S</button>}
             <span title={track.name} style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{track.name}</span>
@@ -625,7 +628,7 @@ function App() {
         </div>)}
         <div className="playhead" style={{left:200+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
       </div>
-      <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover o soltar en otra pista · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
+      <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho en nombre de pista: bajar · Shift + clic derecho: subir · Arrastra clips para moverlos entre pistas · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
     <div className="audio-players" aria-hidden="true">{clips.filter(c=>c.kind==="audio").map(c=><audio key={c.id} ref={element=>{audioRefs.current[c.id]=element;}} src={c.url} preload="metadata" onError={()=>setPreviewErrors(old=>({...old,[c.id]:"El códec de este archivo de audio no es compatible con Chromium."}))} onCanPlay={()=>setPreviewErrors(old=>{if(!old[c.id])return old;const next={...old};delete next[c.id];return next;})}/>)}</div>
     {importing&&<div className="import-overlay"><div className="import-box"><b>Preparando medios…</b><span>Leyendo duraciones, miniaturas y formas de onda</span></div></div>}
