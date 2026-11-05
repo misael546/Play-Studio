@@ -5,6 +5,7 @@ import { readFile, stat, unlink, rename, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
+import { autoUpdater } from "electron-updater";
 
 protocol.registerSchemesAsPrivileged([{ scheme: "media", privileges: { standard: true, supportFetchAPI: true, stream: true, secure: true } }]);
 let mainWindow: BrowserWindow | null = null;
@@ -45,6 +46,25 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowDowngrade = false;
+    autoUpdater.on("update-downloaded", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        void dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "Actualización lista",
+          message: "Hay una actualización de Play Studio lista para instalar.",
+          detail: "Se instalará automáticamente cuando cierres el editor. Tus proyectos guardados no se eliminarán.",
+          buttons: ["Entendido"]
+        });
+      }
+    });
+    autoUpdater.checkForUpdatesAndNotify().catch(error => {
+      console.error("[Play Studio] No se pudo comprobar actualizaciones:", error);
+    });
+  }
   protocol.handle("media", async (request) => {
     const encoded = new URL(request.url).pathname.slice(1);
     const filePath = Buffer.from(encoded, "base64url").toString("utf8");
