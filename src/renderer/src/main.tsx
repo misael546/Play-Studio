@@ -92,6 +92,8 @@ function App() {
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
   const [fps,setFps] = useState<24|30|60>(30);
   const [projectName, setProjectName] = useState("Proyecto sin título");
+  const [timelineHeight,setTimelineHeight]=useState(340);
+  const timelineResizeRef=useRef<{y:number;height:number}|null>(null);
   const videoRefs = useRef<Record<string,HTMLVideoElement|null>>({});
   const audioRefs = useRef<Record<string,HTMLAudioElement|null>>({});
   const playbackFrameRef = useRef<number | null>(null);
@@ -594,8 +596,8 @@ function App() {
         </>:<div className="inspector-empty">Selecciona un clip para ajustar sus propiedades.</div>}
       </aside>
     </main>
-    <section className="timeline">
-      <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Arrastra bordes para recortar</span></div>
+    <section className="timeline" style={{height:timelineHeight,flexBasis:timelineHeight}}>
+      <div className="timeline-toolbar" onContextMenu={e=>e.preventDefault()} onPointerDown={e=>{if(e.button!==2)return;e.preventDefault();timelineResizeRef.current={y:e.clientY,height:timelineHeight};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{const start=timelineResizeRef.current;if(!start)return;setTimelineHeight(Math.max(190,Math.min(window.innerHeight-220,start.height-(e.clientY-start.y))));}} onPointerUp={()=>{timelineResizeRef.current=null;}} onPointerCancel={()=>{timelineResizeRef.current=null;}}><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Arrastra bordes para recortar</span></div>
         <div className="tools"><button className={snapEnabled?"active-tool":""} onClick={()=>setSnapEnabled(value=>!value)} title="Activar o desactivar el ajuste magnético (G)">⌁ Imán {snapEnabled?"ON":"OFF"}</button><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button><button onClick={fitTimeline} title="Ajustar toda la edición">Ajustar</button></div>
       </div>
       <div className="timeline-scroll" ref={timelineScrollRef}>
@@ -628,7 +630,7 @@ function App() {
         </div>)}
         <div className="playhead" style={{left:200+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
       </div>
-      <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho en nombre de pista: bajar · Shift + clic derecho: subir · Arrastra clips para moverlos entre pistas · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
+      <div className="timeline-hint">Clic derecho + arrastrar la barra superior: cambiar altura de la línea de tiempo · Clic derecho en nombre de pista: bajar · Shift + clic derecho: subir · Arrastra clips para moverlos entre pistas · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
     <div className="audio-players" aria-hidden="true">{clips.filter(c=>c.kind==="audio").map(c=><audio key={c.id} ref={element=>{audioRefs.current[c.id]=element;}} src={c.url} preload="metadata" onError={()=>setPreviewErrors(old=>({...old,[c.id]:"El códec de este archivo de audio no es compatible con Chromium."}))} onCanPlay={()=>setPreviewErrors(old=>{if(!old[c.id])return old;const next={...old};delete next[c.id];return next;})}/>)}</div>
     {importing&&<div className="import-overlay"><div className="import-box"><b>Preparando medios…</b><span>Leyendo duraciones, miniaturas y formas de onda</span></div></div>}
