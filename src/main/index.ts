@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, net } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFile, stat, unlink, rename } from "node:fs/promises";
+import { readFile, stat, unlink, rename, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
 
@@ -12,6 +13,7 @@ let exportCanceled = false;
 let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
 let autosaveQueue: Promise<void> = Promise.resolve();
+const previewJobs = new Map<string, Promise<string>>();
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom"; rotation?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; effect?: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -73,6 +75,47 @@ app.whenReady().then(() => {
     if (!info.isFile()) throw new Error("Selecciona un archivo válido.");
     const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
     return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind, size: info.size };
+  });
+  ipcMain.handle("media:preview", async (_event, filePath: string): Promise<string> => {
+    if (typeof filePath !== "string" || !filePath.trim() || !ffmpegPath) throw new Error("No se encontró FFmpeg para preparar la vista previa.");
+    const info = await stat(filePath);
+    if (!info.isFile()) throw new Error("El archivo de video no es válido.");
+    const key = createHash("sha256").update(filePath + "|" + info.size + "|" + info.mtimeMs).digest("hex");
+    const cacheDir = join(app.getPath("userData"), "preview-cache");
+    const outputPath = join(cacheDir, key + ".mp4");
+    const cached = await stat(outputPath).catch(() => null);
+    if (cached?.isFile() && cached.size > 0) return "media://local/" + Buffer.from(outputPath).toString("base64url");
+    const existing = previewJobs.get(key);
+    if (existing) return await existing;
+    const job = (async () => {
+      await mkdir(cacheDir, { recursive: true });
+      const executable = app.isPackaged ? ffmpegPath!.replace("app.asar", "app.asar.unpacked") : ffmpegPath!;
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(executable, [
+          "-hide_banner", "-loglevel", "error", "-y", "-i", filePath,
+          "-map", "0:v:0", "-map", "0:a?", "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2",
+          "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25", "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outputPath
+        ], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+        let errorText = "";
+        let settled = false;
+        const finish = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          if (error) reject(error); else resolve();
+        };
+        const timeout = setTimeout(() => { child.kill(); finish(new Error("La preparación de la vista previa tardó demasiado.")); }, 10 * 60 * 1000);
+        child.stderr.on("data", chunk => { errorText += chunk.toString(); if (errorText.length > 5000) errorText = errorText.slice(-5000); });
+        child.on("error", error => finish(error));
+        child.on("close", code => code === 0 ? finish() : finish(new Error("FFmpeg no pudo preparar este video. " + errorText.slice(-1200))));
+      }).catch(async error => { await unlink(outputPath).catch(() => {}); throw error; });
+      const result = await stat(outputPath);
+      if (!result.isFile() || result.size === 0) throw new Error("FFmpeg generó una vista previa vacía.");
+      return "media://local/" + Buffer.from(outputPath).toString("base64url");
+    })();
+    previewJobs.set(key, job);
+    try { return await job; } finally { previewJobs.delete(key); }
   });
   ipcMain.handle("media:duration", async (_event, filePath: string, kind: "video" | "audio"): Promise<number> => {
     if (typeof filePath !== "string" || !filePath.trim() || (kind !== "video" && kind !== "audio") || !ffmpegPath) return 0;
