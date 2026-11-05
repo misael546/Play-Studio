@@ -1,0 +1,45 @@
+name: Publish Play Studio Web Installer
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: play-studio-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-web-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build and publish web installer
+        run: npm run dist:web
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer files as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Play-Studio-Web-Installer
+          path: |
+            release/*.exe
+            release/*.7z
+            release/*.yml
+          if-no-files-found: warn
+          retention-days: 14
