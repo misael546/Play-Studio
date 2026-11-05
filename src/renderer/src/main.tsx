@@ -207,8 +207,8 @@ function App() {
       }
       const [waveform,thumbnail,previewUrl]=await Promise.all([
         active.kind==="audio"?window.playStudio.getWaveform(replacement.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
-        active.kind==="video"?window.playStudio.getThumbnail(replacement.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null),
-        active.kind==="video"?window.playStudio.getPreviewVideo(replacement.path).catch(()=>undefined):Promise.resolve(undefined)
+        active.kind==="video"?(isImageMedia(replacement.path)?Promise.resolve(replacement.url):window.playStudio.getThumbnail(replacement.path,Math.min(1,mediaDuration/2)).catch(()=>null)):Promise.resolve(null),
+        active.kind==="video"&&!isImageMedia(replacement.path)?window.playStudio.getPreviewVideo(replacement.path).catch(()=>undefined):Promise.resolve(undefined)
       ]);
       setPreviewErrors(old=>{if(!old[active.id])return old;const next={...old};delete next[active.id];return next;});
       commitClips(old=>old.map(clip=>{
