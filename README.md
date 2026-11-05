@@ -31,6 +31,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - `Espacio`: reproducir o pausar.
 - `← / →`: avanzar o retroceder un fotograma.
 - `S`: dividir el clip seleccionado.
+- `G`: activar o desactivar el ajuste magnético de clips.
 - `Ctrl + Z`: deshacer.
 - `Ctrl + Y` o `Ctrl + Shift + Z`: rehacer.
 

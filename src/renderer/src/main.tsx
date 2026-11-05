@@ -79,6 +79,7 @@ function App() {
   const [assistant, setAssistant] = useState(false);
   const [assistantText, setAssistantText] = useState("");
   const [zoom, setZoom] = useState(1);
+  const [snapEnabled, setSnapEnabled] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [dragOverTrack, setDragOverTrack] = useState<string | null>(null);
@@ -358,7 +359,7 @@ function App() {
       setClips(old=>{
         const others=old.filter(c=>c.id!==drag.id);
         let movedStart=Math.max(0,drag.clip.start+delta);
-        if(drag.mode==="move"){
+        if(drag.mode==="move"&&snapEnabled){
           const snapPoints=[playheadRef.current,...others.flatMap(c=>[c.start,c.start+c.duration])];
           let bestDifference=0;
           let bestDistance=8/pixelsPerSecond;
@@ -397,7 +398,7 @@ function App() {
       window.removeEventListener("pointercancel",onCancel);
       window.removeEventListener("blur",onCancel);
     };
-  },[pixelsPerSecond,tracks]);
+  },[pixelsPerSecond,tracks,snapEnabled]);
 
   useEffect(()=>{playheadRef.current=playhead;},[playhead]);
 
@@ -520,6 +521,7 @@ function App() {
       else if(key==="arrowright"){event.preventDefault();setPlayhead(v=>Math.min(duration,v+1/fps));}
       else if(key==="home"){event.preventDefault();setPlayhead(0);setPlaying(false);}
       else if(key==="end"){event.preventDefault();setPlayhead(contentDuration);setPlaying(false);}
+      else if(key==="g"&&!event.ctrlKey&&!event.metaKey){setSnapEnabled(value=>!value);}
       else if(key==="s"&&!event.ctrlKey&&!event.metaKey){split();}
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
@@ -565,8 +567,8 @@ function App() {
       </aside>
     </main>
     <section className="timeline">
-      <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Imán: alinea clips con el cabezal y otros clips; arrastra bordes para recortar</span></div>
-        <div className="tools"><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button><button onClick={fitTimeline} title="Ajustar toda la edición">Ajustar</button></div>
+      <div className="timeline-toolbar"><div><b>LÍNEA DE TIEMPO</b><span className="muted"> · Arrastra bordes para recortar</span></div>
+        <div className="tools"><button className={snapEnabled?"active-tool":""} onClick={()=>setSnapEnabled(value=>!value)} title="Activar o desactivar el ajuste magnético (G)">⌁ Imán {snapEnabled?"ON":"OFF"}</button><button onClick={undo} disabled={!undoStack.length} title="Deshacer (Ctrl+Z)">↶</button><button onClick={redo} disabled={!redoStack.length} title="Rehacer (Ctrl+Y)">↷</button><button onClick={split} title="Dividir en el cabezal">✂ Dividir</button><button onClick={cut}>Cortar</button><button onClick={copy}>Copiar</button><button onClick={paste} disabled={!clipboard}>Pegar</button><button onClick={remove}>Eliminar</button><button onClick={()=>addTrack("video")}>＋ Video</button><button onClick={()=>addTrack("audio")}>＋ Audio</button><span className="separator"></span><button onClick={()=>setZoom(z=>Math.max(.35,z-.2))}>−</button><button onClick={()=>setZoom(z=>Math.min(4,z+.2))}>＋</button><button onClick={fitTimeline} title="Ajustar toda la edición">Ajustar</button></div>
       </div>
       <div className="timeline-scroll" ref={timelineScrollRef}>
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
