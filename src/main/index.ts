@@ -60,7 +60,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  process.on("unhandledRejection", reason => { void recordDiagnostic("MAIN / PROMESA NO CONTROLADA", reason); });\n  process.on("uncaughtException", error => { void recordDiagnostic("MAIN / ERROR CRÍTICO", error).finally(() => app.quit()); });
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
