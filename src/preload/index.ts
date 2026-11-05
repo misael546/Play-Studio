@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("playStudio", {
   openMedia: (): Promise<MediaItem[]> => ipcRenderer.invoke("media:open"),
   relinkMedia: (kind: "video" | "audio"): Promise<MediaItem | null> => ipcRenderer.invoke("media:relink", kind),
   getWaveform: (filePath: string, duration: number): Promise<number[]> => ipcRenderer.invoke("media:waveform", filePath, duration),
+  getThumbnail: (filePath: string, timestamp: number): Promise<string | null> => ipcRenderer.invoke("media:thumbnail", filePath, timestamp),
   saveProject: (data: string, saveAs = false): Promise<boolean> => ipcRenderer.invoke("project:save", data, saveAs),
   resetProjectPath: (): Promise<boolean> => ipcRenderer.invoke("project:reset-path"),
   acceptLoadedProject: (): Promise<boolean> => ipcRenderer.invoke("project:accept-load"),

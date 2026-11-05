@@ -59,6 +59,41 @@ app.whenReady().then(() => {
     const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
     return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind, size: info.size };
   });
+  ipcMain.handle("media:thumbnail", async (_event, filePath: string, timestamp: number): Promise<string | null> => {
+    if (typeof filePath !== "string" || !filePath.trim()) return null;
+    const info = await stat(filePath);
+    if (!info.isFile() || !ffmpegPath) return null;
+    const executable = app.isPackaged ? ffmpegPath.replace("app.asar", "app.asar.unpacked") : ffmpegPath;
+    const seek = typeof timestamp === "number" && Number.isFinite(timestamp) ? Math.max(0, Math.min(3600, timestamp)) : 0;
+    return await new Promise<string | null>(resolve => {
+      let settled = false;
+      let totalBytes = 0;
+      const chunks: Buffer[] = [];
+      let timeout: ReturnType<typeof setTimeout>;
+      const finish = (value: string | null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(value);
+      };
+      const child = spawn(executable, [
+        "-hide_banner", "-loglevel", "error", "-ss", seek.toFixed(3), "-i", filePath,
+        "-frames:v", "1", "-vf", "scale=160:90:force_original_aspect_ratio=decrease,pad=160:90:(ow-iw)/2:(oh-ih)/2:color=black",
+        "-q:v", "5", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1"
+      ], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+      timeout = setTimeout(() => { child.kill(); finish(null); }, 15000);
+      child.stdout.on("data", (chunk: Buffer) => {
+        totalBytes += chunk.length;
+        if (totalBytes > 2 * 1024 * 1024) { child.kill(); finish(null); return; }
+        chunks.push(Buffer.from(chunk));
+      });
+      child.on("error", () => finish(null));
+      child.on("close", code => {
+        if (code !== 0 || totalBytes === 0) { finish(null); return; }
+        finish("data:image/jpeg;base64," + Buffer.concat(chunks).toString("base64"));
+      });
+    });
+  });
   ipcMain.handle("media:waveform", async (_event, filePath: string, duration: number): Promise<number[]> => {
     if (typeof filePath !== "string" || !filePath.trim() || !Number.isFinite(duration) || duration <= 0) return [];
     const info = await stat(filePath);

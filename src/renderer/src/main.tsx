@@ -4,7 +4,7 @@ import type { MediaItem, ExportClip, ExportRequest } from "../../preload";
 import "./style.css";
 
 type Track = { id: string; name: string; kind: "video" | "audio" };
-type Clip = MediaItem & { waveform?: number[]; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
+type Clip = MediaItem & { waveform?: number[]; thumbnail?: string; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
 declare global {
   interface Window {
@@ -12,6 +12,7 @@ declare global {
       openMedia: () => Promise<MediaItem[]>;
       relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
+      getThumbnail: (filePath: string, timestamp: number) => Promise<string | null>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
       resetProjectPath: () => Promise<boolean>;
       acceptLoadedProject: () => Promise<boolean>;
@@ -56,7 +57,7 @@ async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: 
   }
   return results;
 }
-const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,...clip})=>clip)});
+const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,thumbnail,...clip})=>clip)});
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<Clip[][]>([]);
@@ -71,6 +72,7 @@ function App() {
   const [zoom, setZoom] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [previewErrors, setPreviewErrors] = useState<Record<string,string>>({});
   const [exportProgress, setExportProgress] = useState(0);
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
   const [fps,setFps] = useState<24|30|60>(30);
@@ -114,8 +116,11 @@ function App() {
       try {
         const prepared = await mapInBatches(items,2,async item => {
           const mediaDuration=await readDuration(item);
-          const waveform=item.kind==="audio"&&mediaDuration>0?await window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):undefined;
-          return {...item,mediaDuration,waveform};
+          const [waveform,thumbnail]=await Promise.all([
+            item.kind==="audio"&&mediaDuration>0?window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
+            item.kind==="video"&&mediaDuration>0?window.playStudio.getThumbnail(item.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null)
+          ]);
+          return {...item,mediaDuration,waveform,thumbnail:thumbnail??undefined};
         });
         const valid = prepared.filter(item => item.mediaDuration > 0);
         const invalid = prepared.filter(item => item.mediaDuration <= 0);
@@ -154,11 +159,15 @@ function App() {
         alert("No se pudo leer la duración del archivo seleccionado.");
         return;
       }
-      const waveform=active.kind==="audio"?await window.playStudio.getWaveform(replacement.path,mediaDuration).catch(()=>[]):undefined;
+      const [waveform,thumbnail]=await Promise.all([
+        active.kind==="audio"?window.playStudio.getWaveform(replacement.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
+        active.kind==="video"?window.playStudio.getThumbnail(replacement.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null)
+      ]);
+      setPreviewErrors(old=>{if(!old[active.id])return old;const next={...old};delete next[active.id];return next;});
       commitClips(old=>old.map(clip=>{
         if(clip.id!==active.id)return clip;
         const sourceStart=Math.min(clip.sourceStart,mediaDuration-0.1);
-        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart)),waveform};
+        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart)),waveform,thumbnail:thumbnail??undefined};
       }));
     }catch(error){alert(error instanceof Error?"No se pudo reemplazar el medio: "+error.message:"No se pudo reemplazar el medio.");}
   };
@@ -199,7 +208,7 @@ function App() {
   };
   const save = async (saveAs = false) => {
     try{
-      const data={version:2,name:projectName,tracks,clips:clips.map(({url,...c})=>c),playhead};
+      const data={version:2,name:projectName,tracks,clips:clips.map(({url,thumbnail,...c})=>c),playhead};
       const saved=await window.playStudio.saveProject(JSON.stringify(data,null,2),saveAs);
       if(!saved)return;
       savedProjectKeyRef.current=makeProjectKey(projectName,tracks,clips);
@@ -229,12 +238,16 @@ function App() {
         const fallbackTrack=normalizedTracks.find(t=>t.kind===clip.kind)?.id??normalizedTracks[0].id;
         const track=normalizedTracks.some(t=>t.id===clip.track&&t.kind===clip.kind)?clip.track:fallbackTrack;
         const savedWaveform=Array.isArray(clip.waveform)?clip.waveform.filter((peak:any)=>Number.isFinite(peak)).slice(0,180).map((peak:number)=>Math.max(0,Math.min(1,peak))):[];
-        const waveform=savedWaveform.length?savedWaveform:clip.kind==="audio"?await window.playStudio.getWaveform(clip.path,sourceDuration).catch(()=>[]):undefined;
-        return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",url:makeMediaUrl(clip.path)} as Clip;
+        const [waveform,thumbnail]=await Promise.all([
+          clip.kind==="audio"?(savedWaveform.length?Promise.resolve(savedWaveform):window.playStudio.getWaveform(clip.path,sourceDuration).catch(()=>[])):Promise.resolve(undefined),
+          clip.kind==="video"?window.playStudio.getThumbnail(clip.path,Math.min(1,sourceDuration/2)).catch(()=>null):Promise.resolve(null)
+        ]);
+        return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,thumbnail:thumbnail??undefined,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",url:makeMediaUrl(clip.path)} as Clip;
       });
       setProjectName(importedProjectName);
       setTracks(normalizedTracks);
       setClips(normalizedClips);
+      setPreviewErrors({});
       savedProjectKeyRef.current=makeProjectKey(importedProjectName,normalizedTracks,normalizedClips);
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
       await window.playStudio.acceptLoadedProject();
@@ -246,6 +259,7 @@ function App() {
     void window.playStudio.resetProjectPath();
     const defaultTracks:Track[]=[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}];
     savedProjectKeyRef.current=makeProjectKey("Proyecto sin título",defaultTracks,[]);
+    setPreviewErrors({});
     setProjectName("Proyecto sin título");
     setTracks(defaultTracks);
     setClips([]);setSelected(null);setClipboard(null);setPlayhead(0);setPlaying(false);setUndoStack([]);setRedoStack([]);
@@ -438,12 +452,12 @@ function App() {
       <aside className="media-panel">
         <div className="panel-heading"><b>MEDIOS DEL PROYECTO</b><button className="plus" onClick={addMedia}>＋</button></div>
         <button className="add-media" onClick={addMedia}>＋ Añadir video o audio</button>
-        <div className="media-list">{clips.map(c=><button key={c.id} className={"media-item "+(selected===c.id?"active":"")} onClick={()=>{setSelected(c.id);setPlayhead(c.start);setPlaying(false);}}><span className="media-icon">{c.kind==="audio"?"♫":"▣"}</span><span>{c.name}</span></button>)}</div>
+        <div className="media-list">{clips.map(c=><button key={c.id} className={"media-item "+(selected===c.id?"active":"")} onClick={()=>{setSelected(c.id);setPlayhead(c.start);setPlaying(false);}}><span className="media-thumb">{c.kind==="video"&&c.thumbnail?<img src={c.thumbnail} alt="" />:<span className="media-icon">{c.kind==="audio"?"♫":"▣"}</span>}</span><span>{c.name}</span></button>)}</div>
         <div className="panel-footer">Importa MP4, MOV, MKV, MP3, WAV y más formatos</div>
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onLoadedMetadata={e=>{const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}</div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%)`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onError={()=>setPreviewErrors(old=>({...old,[clip.id]:"Este archivo usa un formato o códec que Chromium no puede reproducir en la vista previa."}))} onLoadedMetadata={e=>{setPreviewErrors(old=>{if(!old[clip.id])return old;const next={...old};delete next[clip.id];return next;});const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}{previewLayers.some(layer=>previewErrors[layer.id])&&<div className="preview-error"><b>No se puede mostrar este video</b><span>{previewErrors[previewLayers.find(layer=>previewErrors[layer.id])!.id]}</span><small>Convierte el archivo a MP4 con video H.264 para editarlo en la vista previa. FFmpeg puede admitir más formatos al exportar.</small></div>}</div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
@@ -487,7 +501,7 @@ function App() {
               const waveEnd=c.sourceDuration>0?Math.ceil((c.sourceStart+c.duration)/c.sourceDuration*sourceWaveform.length):sourceWaveform.length;
               const visibleWaveform=sourceWaveform.slice(waveStart,Math.max(waveStart+1,waveEnd));
               return <div key={c.id} className={"clip "+track.kind+(selected===c.id?" selected":"")} style={{left:c.start*pixelsPerSecond,width:Math.max(32,c.duration*pixelsPerSecond)}} onClick={()=>setSelected(c.id)} onContextMenu={e=>{e.preventDefault();setSelected(c.id);setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond)+c.start);}}>
-                <span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
+                {c.kind==="video"&&c.thumbnail&&<img className="timeline-clip-thumbnail" src={c.thumbnail} alt="" draggable={false}/>}<span className="trim-handle left" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"left",x:e.clientX,clip:{...c}};}}/>
                 <b>{track.kind==="audio"?"♫":"▣"} {c.name}</b><small>{time(c.duration)}</small>
                 {track.kind==="audio"&&visibleWaveform.length>0&&<div className="clip-waveform">{visibleWaveform.map((peak,index)=><i key={index} style={{height:Math.max(2,peak*100)+"%"}}/>)}</div>}
                 <span className="trim-handle right" onPointerDown={e=>{e.stopPropagation();e.preventDefault();setSelected(c.id);setUndoStack(old=>[...old,clips].slice(-60));setRedoStack([]);dragRef.current={id:c.id,mode:"right",x:e.clientX,clip:{...c}};}}/>

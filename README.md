@@ -7,6 +7,8 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Lectura de duración de medios, rechazo de archivos cuya duración no se puede leer y biblioteca del proyecto.
 - Varias pistas de video y audio, con capas superpuestas en el monitor y orden de composición según la pista.
 - Formas de onda de audio generadas con FFmpeg y ajustadas al recorte del clip.
+- Miniaturas de video en la biblioteca y la línea de tiempo, generadas con FFmpeg y regeneradas al abrir proyectos.
+- Aviso en el monitor cuando Chromium no puede decodificar el formato o códec de un video.
 - Selección, mover clips, recortar bordes, dividir, cortar, copiar, pegar y eliminar.
 - Cabezal de reproducción controlado con clic derecho en la línea de tiempo, regla clicable, seguimiento automático durante reproducción y avance sincronizado con reloj real.
 - Propiedades de posición, duración y volumen de clips de video y audio.
