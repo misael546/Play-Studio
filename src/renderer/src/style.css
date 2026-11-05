@@ -24,3 +24,5 @@
 .clip.audio b,.clip.audio small{position:relative;z-index:4}
 
 .import-overlay{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:18}.import-box{min-width:320px;background:#20242e;border:1px solid #46566b;border-radius:10px;padding:22px;display:grid;gap:10px;box-shadow:0 12px 40px #0009}.import-box span{color:#aeb4c1;font-size:12px}
+
+.inspector label.effect-toggle{justify-content:space-between}.inspector label.effect-toggle input[type=checkbox]{width:16px;height:16px;accent-color:#8976f1}
