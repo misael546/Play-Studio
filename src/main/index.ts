@@ -59,6 +59,36 @@ app.whenReady().then(() => {
     const name = filePath.split(/[\\\\/]/).pop() ?? filePath;
     return { id: crypto.randomUUID(), name, path: filePath, url: "media://local/" + Buffer.from(filePath).toString("base64url"), kind, size: info.size };
   });
+  ipcMain.handle("media:duration", async (_event, filePath: string): Promise<number> => {
+    if (typeof filePath !== "string" || !filePath.trim() || !ffmpegPath) return 0;
+    const info = await stat(filePath);
+    if (!info.isFile()) return 0;
+    const executable = app.isPackaged ? ffmpegPath.replace("app.asar", "app.asar.unpacked") : ffmpegPath;
+    return await new Promise<number>(resolve => {
+      let settled = false;
+      let errorText = "";
+      let timeout: ReturnType<typeof setTimeout>;
+      const finish = (duration: number) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(duration);
+      };
+      const child = spawn(executable, ["-hide_banner", "-i", filePath], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+      timeout = setTimeout(() => { child.kill(); finish(0); }, 10000);
+      child.stderr.on("data", chunk => {
+        errorText += chunk.toString();
+        if (errorText.length > 12000) errorText = errorText.slice(-12000);
+      });
+      child.on("error", () => finish(0));
+      child.on("close", () => {
+        const match = errorText.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+        if (!match) { finish(0); return; }
+        const duration = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+        finish(Number.isFinite(duration) && duration > 0 ? duration : 0);
+      });
+    });
+  });
   ipcMain.handle("media:thumbnail", async (_event, filePath: string, timestamp: number): Promise<string | null> => {
     if (typeof filePath !== "string" || !filePath.trim()) return null;
     const info = await stat(filePath);

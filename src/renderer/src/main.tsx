@@ -13,6 +13,7 @@ declare global {
       relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
       getThumbnail: (filePath: string, timestamp: number) => Promise<string | null>;
+      getMediaDuration: (filePath: string) => Promise<number>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
       resetProjectPath: () => Promise<boolean>;
       acceptLoadedProject: () => Promise<boolean>;
@@ -24,25 +25,29 @@ declare global {
   }
 }
 const makeMediaUrl = (path: string) => "media://local/" + btoa(unescape(encodeURIComponent(path))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const readDuration = (item: MediaItem) => new Promise<number>(resolve => {
-  const element = document.createElement(item.kind === "audio" ? "audio" : "video");
-  let settled = false;
-  const finish = (duration: number) => {
-    if (settled) return;
-    settled = true;
-    window.clearTimeout(timeout);
-    element.onloadedmetadata = null;
-    element.onerror = null;
-    element.removeAttribute("src");
-    element.load();
-    resolve(duration);
-  };
-  const timeout = window.setTimeout(() => finish(0), 20000);
-  element.preload = "metadata";
-  element.onloadedmetadata = () => finish(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0);
-  element.onerror = () => finish(0);
-  element.src = item.url;
-});
+const readDuration = async (item: MediaItem): Promise<number> => {
+  const browserDuration = await new Promise<number>(resolve => {
+    const element = document.createElement(item.kind === "audio" ? "audio" : "video");
+    let settled = false;
+    const finish = (duration: number) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      element.onloadedmetadata = null;
+      element.onerror = null;
+      element.removeAttribute("src");
+      element.load();
+      resolve(duration);
+    };
+    const timeout = window.setTimeout(() => finish(0), 8000);
+    element.preload = "metadata";
+    element.onloadedmetadata = () => finish(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0);
+    element.onerror = () => finish(0);
+    element.src = item.url;
+  });
+  if (browserDuration > 0) return browserDuration;
+  return await window.playStudio.getMediaDuration(item.path).catch(() => 0);
+};
 const fadeGain = (clip: Clip, elapsed: number) => {
   const fadeInGain = clip.fadeIn > 0 ? elapsed / clip.fadeIn : 1;
   const remaining = clip.duration - elapsed;
