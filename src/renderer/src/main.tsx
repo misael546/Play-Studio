@@ -177,7 +177,25 @@ function App() {
   const cut = () => { if (active) { setClipboard({...active});remove(); } };
   const addTrack = (kind:"video"|"audio") => {
     const count=tracks.filter(t=>t.kind===kind).length+1;
-    setTracks(old=>[...old,{id:kind+"-"+count,name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
+    setTracks(old=>[...old,{id:crypto.randomUUID(),name:(kind==="video"?"VIDEO ":"AUDIO ")+count,kind}]);
+  };
+  const renameTrack = (track:Track) => {
+    const name=window.prompt("Nuevo nombre para la pista:",track.name);
+    if(name===null)return;
+    const cleanName=name.trim().slice(0,32);
+    if(!cleanName){alert("El nombre de la pista no puede estar vacío.");return;}
+    setTracks(old=>old.map(item=>item.id===track.id?{...item,name:cleanName}:item));
+  };
+  const moveTrack = (index:number,direction:-1|1) => {
+    const target=index+direction;
+    if(target<0||target>=tracks.length)return;
+    setTracks(old=>{const next=[...old];[next[index],next[target]]=[next[target],next[index]];return next;});
+  };
+  const deleteTrack = (track:Track) => {
+    if(clips.some(clip=>clip.track===track.id)){alert("La pista contiene clips. Mueve o elimina esos clips antes de borrar la pista.");return;}
+    if(tracks.filter(item=>item.kind===track.kind).length<=1){alert("Debe quedar al menos una pista de "+(track.kind==="video"?"video":"audio")+".");return;}
+    if(!window.confirm("¿Eliminar la pista vacía \""+track.name+"\"?"))return;
+    setTracks(old=>old.filter(item=>item.id!==track.id));
   };
   const save = async (saveAs = false) => {
     try{
@@ -454,8 +472,14 @@ function App() {
       </div>
       <div className="timeline-scroll" ref={timelineScrollRef}>
         <div className="ruler"><div className="track-label"></div><div className="ruler-area" style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onClick={e=>setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond))} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>{Array.from({length:Math.ceil(duration/5)+1},(_,i)=><span key={i} style={{left:i*5*pixelsPerSecond}}>{time(i*5)}</span>)}</div></div>
-        {tracks.map(track=><div className="track-row" key={track.id}>
-          <div className="track-label">{track.name}</div>
+        {tracks.map((track,trackIndex)=><div className="track-row" key={track.id}>
+          <div className="track-label" style={{display:"flex",alignItems:"center",gap:4,padding:"0 6px"}}>
+            <span title={track.name} style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{track.name}</span>
+            <button title="Renombrar pista" aria-label={"Renombrar "+track.name} onClick={()=>renameTrack(track)} style={{padding:"3px 4px",fontSize:11}}>✎</button>
+            <button title="Subir pista" aria-label={"Subir "+track.name} disabled={trackIndex===0} onClick={()=>moveTrack(trackIndex,-1)} style={{padding:"3px 4px",fontSize:11}}>↑</button>
+            <button title="Bajar pista" aria-label={"Bajar "+track.name} disabled={trackIndex===tracks.length-1} onClick={()=>moveTrack(trackIndex,1)} style={{padding:"3px 4px",fontSize:11}}>↓</button>
+            <button title="Eliminar pista vacía" aria-label={"Eliminar "+track.name} disabled={clips.some(clip=>clip.track===track.id)||tracks.filter(item=>item.kind===track.kind).length<=1} onClick={()=>deleteTrack(track)} style={{padding:"3px 4px",fontSize:11,color:"#ff9da9"}}>×</button>
+          </div>
           <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
             {clips.filter(c=>c.track===track.id).map(c=>{
               const sourceWaveform=c.waveform??[];
