@@ -81,6 +81,7 @@ function App() {
   const [zoom, setZoom] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [dragOverTrack, setDragOverTrack] = useState<string | null>(null);
   const [previewErrors, setPreviewErrors] = useState<Record<string,string>>({});
   const [exportProgress, setExportProgress] = useState(0);
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
@@ -352,6 +353,7 @@ function App() {
       const target= document.elementFromPoint(event.clientX,event.clientY)?.closest("[data-track-id]") as HTMLElement|null;
       const targetTrack=target?.dataset.trackId;
       const allowedTrack=targetTrack&&tracks.some(t=>t.id===targetTrack&&t.kind===drag.clip.kind)?targetTrack:drag.clip.track;
+      if(drag.mode==="move")setDragOverTrack(allowedTrack);
       setClips(old=>{
         const others=old.filter(c=>c.id!==drag.id);
         let movedStart=Math.max(0,drag.clip.start+delta);
@@ -382,8 +384,8 @@ function App() {
         });
       });
     };
-    const onUp=()=>{dragRef.current=null;};
-    const onCancel=()=>{dragRef.current=null;};
+    const onUp=()=>{dragRef.current=null;setDragOverTrack(null);};
+    const onCancel=()=>{dragRef.current=null;setDragOverTrack(null);};
     window.addEventListener("pointermove",onMove);
     window.addEventListener("pointerup",onUp);
     window.addEventListener("pointercancel",onCancel);
@@ -574,7 +576,7 @@ function App() {
             <button title="Bajar pista" aria-label={"Bajar "+track.name} disabled={trackIndex===tracks.length-1} onClick={()=>moveTrack(trackIndex,1)} style={{padding:"3px 4px",fontSize:11}}>↓</button>
             <button title="Eliminar pista vacía" aria-label={"Eliminar "+track.name} disabled={clips.some(clip=>clip.track===track.id)||tracks.filter(item=>item.kind===track.kind).length<=1} onClick={()=>deleteTrack(track)} style={{padding:"3px 4px",fontSize:11,color:"#ff9da9"}}>×</button>
           </div>
-          <div className="track-area" data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
+          <div className={"track-area"+(dragOverTrack===track.id?" drop-target":"")} data-track-id={track.id} style={{width:duration*pixelsPerSecond,backgroundSize:pixelsPerSecond+"px 100%"}} onContextMenu={e=>{e.preventDefault();setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}} onClick={e=>{if(e.target===e.currentTarget)setPlayhead(Math.max(0,(e.clientX-e.currentTarget.getBoundingClientRect().left)/pixelsPerSecond));}}>
             {clips.filter(c=>c.track===track.id).map(c=>{
               const sourceWaveform=c.waveform??[];
               const waveStart=c.sourceDuration>0?Math.floor(c.sourceStart/c.sourceDuration*sourceWaveform.length):0;
@@ -592,7 +594,7 @@ function App() {
         </div>)}
         <div className="playhead" style={{left:150+playhead*pixelsPerSecond}}><div className="playhead-cap"></div></div>
       </div>
-      <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
+      <div className="timeline-hint">Clic izquierdo: seleccionar · Clic derecho: mover el cabezal · Arrastrar clip: mover o soltar en otra pista · Arrastrar bordes: recortar · Ctrl+C / Ctrl+V / Ctrl+X · Supr: eliminar</div>
     </section>
     <div className="audio-players" aria-hidden="true">{clips.filter(c=>c.kind==="audio").map(c=><audio key={c.id} ref={element=>{audioRefs.current[c.id]=element;}} src={c.url} preload="auto" onError={()=>setPreviewErrors(old=>({...old,[c.id]:"El códec de este archivo de audio no es compatible con Chromium."}))} onCanPlay={()=>setPreviewErrors(old=>{if(!old[c.id])return old;const next={...old};delete next[c.id];return next;})}/>)}</div>
     {importing&&<div className="import-overlay"><div className="import-box"><b>Preparando medios…</b><span>Analizando archivos y generando formas de onda</span></div></div>}

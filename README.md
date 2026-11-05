@@ -5,7 +5,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 ## Funciones implementadas en esta base
 - Importar video y audio desde el explorador de Windows.
 - Lectura de duración de medios, rechazo de archivos cuya duración no se puede leer y biblioteca del proyecto.
-- Varias pistas de video y audio, con capas superpuestas en el monitor y orden de composición según la pista.
+- Varias pistas de video y audio, con capas superpuestas en el monitor y orden de composición según la pista. Los clips se pueden arrastrar verticalmente entre pistas compatibles.
 - Renombrar, reordenar y eliminar pistas vacías; Deshacer y Rehacer incluyen cambios de pistas y clips.
 - Formas de onda de audio generadas con FFmpeg y ajustadas al recorte del clip.
 - Miniaturas de video en la biblioteca y la línea de tiempo, generadas con FFmpeg y regeneradas al abrir proyectos.
