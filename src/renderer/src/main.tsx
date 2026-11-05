@@ -56,6 +56,7 @@ async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: 
   }
   return results;
 }
+const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,...clip})=>clip)});
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<Clip[][]>([]);
@@ -82,6 +83,9 @@ function App() {
   const playheadRef = useRef(0);
   const active = clips.find(c => c.id === selected);
   const contentDuration = Math.max(0, ...clips.map(c => c.start + c.duration));
+  const projectContentKey = makeProjectKey(projectName,tracks,clips);
+  const savedProjectKeyRef = useRef(projectContentKey);
+  const isDirty = projectContentKey !== savedProjectKeyRef.current;
   const duration = Math.max(30, contentDuration);
   const pixelsPerSecond = 48 * zoom;
   const previewClips = clips.filter(c => c.kind === "video" && playhead >= c.start && playhead < c.start + c.duration).sort((a,b)=>tracks.findIndex(t=>t.id===a.track)-tracks.findIndex(t=>t.id===b.track)||a.start-b.start);
@@ -180,10 +184,11 @@ function App() {
       const data={version:2,name:projectName,tracks,clips:clips.map(({url,...c})=>c),playhead};
       const saved=await window.playStudio.saveProject(JSON.stringify(data,null,2),saveAs);
       if(!saved)return;
+      savedProjectKeyRef.current=makeProjectKey(projectName,tracks,clips);
     }catch(error){alert(error instanceof Error?"No se pudo guardar el proyecto: "+error.message:"No se pudo guardar el proyecto.");}
   };
   const load = async () => {
-    if(clips.length&&!window.confirm("Abrir otro proyecto y descartar los cambios actuales? Guarda primero si los necesitas."))return;
+    if(isDirty&&!window.confirm("Abrir otro proyecto y descartar los cambios actuales? Guarda primero si los necesitas."))return;
     let data:string|null;
     try{data=await window.playStudio.loadProject();}
     catch(error){alert(error instanceof Error?"No se pudo abrir el proyecto: "+error.message:"No se pudo abrir el proyecto.");return;}
@@ -212,16 +217,19 @@ function App() {
       setProjectName(importedProjectName);
       setTracks(normalizedTracks);
       setClips(normalizedClips);
+      savedProjectKeyRef.current=makeProjectKey(importedProjectName,normalizedTracks,normalizedClips);
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
       await window.playStudio.acceptLoadedProject();
     } catch { alert("El archivo de proyecto no es válido."); }
     finally { setImporting(false); }
   };
   const newProject = () => {
-    if(clips.length&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
+    if(isDirty&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
     void window.playStudio.resetProjectPath();
+    const defaultTracks:Track[]=[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}];
+    savedProjectKeyRef.current=makeProjectKey("Proyecto sin título",defaultTracks,[]);
     setProjectName("Proyecto sin título");
-    setTracks([{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}]);
+    setTracks(defaultTracks);
     setClips([]);setSelected(null);setClipboard(null);setPlayhead(0);setPlaying(false);setUndoStack([]);setRedoStack([]);
   };
   const exportVideo = async () => {
@@ -403,7 +411,7 @@ function App() {
 
   return <div className="app">
     <header className="topbar">
-      <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO</b><small>EDITOR DE VIDEO</small></div></div>
+      <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO{isDirty?" •":""}</b><small>{isDirty?"CAMBIOS SIN GUARDAR":"EDITOR DE VIDEO"}</small></div></div>
       <nav><button onClick={newProject}>Nuevo proyecto</button><button onClick={load}>Abrir proyecto</button><button onClick={()=>void save()}>Guardar</button><button onClick={()=>void save(true)}>Guardar como</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
       <button className="assistant-toggle" onClick={()=>setAssistant(!assistant)}>✦ Asistente</button>
     </header>
