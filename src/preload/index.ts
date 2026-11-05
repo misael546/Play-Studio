@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 export type MediaItem = { id: string; name: string; path: string; url: string; kind: "video" | "audio"; size: number };
 export type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom"; rotation?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; effect?: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 export type ExportRequest = { clips: ExportClip[]; resolution: "720p" | "1080p" | "4k"; fps: 24 | 30 | 60 };
-contextBridge.exposeInMainWorld("playStudio", {
+contextBridge.exposeInMainWorld("playStudio", {\n  getAppVersion: (): Promise<string> => ipcRenderer.invoke("app:version"),\n  writeDiagnostic: (source: string, message: string): Promise<boolean> => ipcRenderer.invoke("diagnostics:write", source, message),\n  readDiagnostics: (): Promise<string> => ipcRenderer.invoke("diagnostics:read"),\n  clearDiagnostics: (): Promise<boolean> => ipcRenderer.invoke("diagnostics:clear"),
   openMedia: (): Promise<MediaItem[]> => ipcRenderer.invoke("media:open"),
   relinkMedia: (kind: "video" | "audio"): Promise<MediaItem | null> => ipcRenderer.invoke("media:relink", kind),
   getWaveform: (filePath: string, duration: number): Promise<number[]> => ipcRenderer.invoke("media:waveform", filePath, duration),
