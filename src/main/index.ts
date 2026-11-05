@@ -11,6 +11,7 @@ let exportProcess: ReturnType<typeof spawn> | null = null;
 let exportCanceled = false;
 let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
+let autosaveGeneration = 0;
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -199,11 +200,16 @@ app.whenReady().then(() => {
   const recoveryPath = join(app.getPath("userData"), "play-studio-recovery.json");
   ipcMain.handle("project:autosave", async (_event, data: string) => {
     if (typeof data !== "string" || data.length > 25 * 1024 * 1024) throw new Error("El respaldo automático es demasiado grande.");
+    const generation = autosaveGeneration;
     const fs = await import("node:fs/promises");
     const temporaryPath = recoveryPath + "." + crypto.randomUUID() + ".tmp";
     try {
       await fs.mkdir(app.getPath("userData"), { recursive: true });
       await fs.writeFile(temporaryPath, data, "utf8");
+      if (generation !== autosaveGeneration) {
+        await fs.unlink(temporaryPath).catch(() => {});
+        return false;
+      }
       await fs.rename(temporaryPath, recoveryPath);
       return true;
     } catch (error) {
@@ -224,6 +230,7 @@ app.whenReady().then(() => {
     }
   });
   ipcMain.handle("project:clear-autosave", async () => {
+    autosaveGeneration += 1;
     await unlink(recoveryPath).catch(() => {});
     return true;
   });
