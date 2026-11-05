@@ -72,7 +72,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("media:open", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"], filters: [
-      { name: "Medios compatibles", extensions: ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob","mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape"] },
+      { name: "Medios compatibles", extensions: ["mp4","mov","mkv","avi","webm","m4v","3gp","mpg","mpeg","ts","mts","m2ts","flv","ogv","wmv","asf","vob","mp3","wav","aac","m4a","flac","ogg","wma","opus","aiff","aif","amr","ape","png","jpg","jpeg","gif","webp","bmp","tif","tiff"] },
       { name: "Todos los archivos", extensions: ["*"] }
     ]});
     if (result.canceled) return [];
