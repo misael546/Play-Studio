@@ -5,7 +5,7 @@ import "./style.css";
 
 type Track = { id: string; name: string; kind: "video" | "audio"; muted?: boolean; solo?: boolean };
 type EditSnapshot = { clips: Clip[]; tracks: Track[] };
-type Clip = MediaItem & { waveform?: number[]; thumbnail?: string; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom"; rotation: 0 | 90 | 180 | 270; flipHorizontal: boolean; flipVertical: boolean; effect: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
+type Clip = MediaItem & { waveform?: number[]; thumbnail?: string; previewUrl?: string; start: number; duration: number; sourceStart: number; sourceDuration: number; track: string; volume: number; fadeIn: number; fadeOut: number; brightness: number; contrast: number; saturation: number; title: string; titleSize: number; titlePosition: "top" | "center" | "bottom"; rotation: 0 | 90 | 180 | 270; flipHorizontal: boolean; flipVertical: boolean; effect: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 type DragState = { id: string; mode: "move" | "left" | "right"; x: number; clip: Clip };
 declare global {
   interface Window {
@@ -15,6 +15,7 @@ declare global {
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
       getThumbnail: (filePath: string, timestamp: number) => Promise<string | null>;
       getMediaDuration: (filePath: string, kind: "video" | "audio") => Promise<number>;
+      getPreviewVideo: (filePath: string) => Promise<string>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
       autosaveProject: (data: string) => Promise<boolean>;
       readAutosaveProject: () => Promise<string | null>;
@@ -66,7 +67,7 @@ async function mapInBatches<T, R>(items: T[], batchSize: number, mapper: (item: 
   }
   return results;
 }
-const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,thumbnail,...clip})=>clip)});
+const makeProjectKey = (name: string, tracks: Track[], clips: Clip[]) => JSON.stringify({name,tracks,clips:clips.map(({url,thumbnail,previewUrl,...clip})=>clip)});
 function App() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [undoStack, setUndoStack] = useState<EditSnapshot[]>([]);
@@ -155,11 +156,12 @@ function App() {
       try {
         const prepared = await mapInBatches(items,2,async item => {
           const mediaDuration=await readDuration(item);
-          const [waveform,thumbnail]=await Promise.all([
+          const [waveform,thumbnail,previewUrl]=await Promise.all([
             item.kind==="audio"&&mediaDuration>0?window.playStudio.getWaveform(item.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
-            item.kind==="video"&&mediaDuration>0?window.playStudio.getThumbnail(item.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null)
+            item.kind==="video"&&mediaDuration>0?window.playStudio.getThumbnail(item.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null),
+            item.kind==="video"&&mediaDuration>0?window.playStudio.getPreviewVideo(item.path).catch(()=>undefined):Promise.resolve(undefined)
           ]);
-          return {...item,mediaDuration,waveform,thumbnail:thumbnail??undefined};
+          return {...item,mediaDuration,waveform,thumbnail:thumbnail??undefined,previewUrl};
         });
         const valid = prepared.filter(item => item.mediaDuration > 0);
         const invalid = prepared.filter(item => item.mediaDuration <= 0);
@@ -198,15 +200,16 @@ function App() {
         alert("No se pudo leer la duración del archivo seleccionado.");
         return;
       }
-      const [waveform,thumbnail]=await Promise.all([
+      const [waveform,thumbnail,previewUrl]=await Promise.all([
         active.kind==="audio"?window.playStudio.getWaveform(replacement.path,mediaDuration).catch(()=>[]):Promise.resolve(undefined),
-        active.kind==="video"?window.playStudio.getThumbnail(replacement.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null)
+        active.kind==="video"?window.playStudio.getThumbnail(replacement.path,Math.min(1,mediaDuration/2)).catch(()=>null):Promise.resolve(null),
+        active.kind==="video"?window.playStudio.getPreviewVideo(replacement.path).catch(()=>undefined):Promise.resolve(undefined)
       ]);
       setPreviewErrors(old=>{if(!old[active.id])return old;const next={...old};delete next[active.id];return next;});
       commitClips(old=>old.map(clip=>{
         if(clip.id!==active.id)return clip;
         const sourceStart=Math.min(clip.sourceStart,mediaDuration-0.1);
-        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart)),waveform,thumbnail:thumbnail??undefined};
+        return {...clip,name:replacement.name,path:replacement.path,url:replacement.url,previewUrl,size:replacement.size,sourceDuration:mediaDuration,sourceStart,duration:Math.max(0.1,Math.min(clip.duration,mediaDuration-sourceStart)),waveform,thumbnail:thumbnail??undefined};
       }));
     }catch(error){alert(error instanceof Error?"No se pudo reemplazar el medio: "+error.message:"No se pudo reemplazar el medio.");}
   };
@@ -273,11 +276,12 @@ function App() {
         const fallbackTrack=normalizedTracks.find(t=>t.kind===clip.kind)?.id??normalizedTracks[0].id;
         const track=normalizedTracks.some(t=>t.id===clip.track&&t.kind===clip.kind)?clip.track:fallbackTrack;
         const savedWaveform=Array.isArray(clip.waveform)?clip.waveform.filter((peak:any)=>Number.isFinite(peak)).slice(0,180).map((peak:number)=>Math.max(0,Math.min(1,peak))):[];
-        const [waveform,thumbnail]=await Promise.all([
+        const [waveform,thumbnail,previewUrl]=await Promise.all([
           clip.kind==="audio"?(savedWaveform.length?Promise.resolve(savedWaveform):window.playStudio.getWaveform(clip.path,sourceDuration).catch(()=>[])):Promise.resolve(undefined),
-          clip.kind==="video"?window.playStudio.getThumbnail(clip.path,Math.min(1,sourceDuration/2)).catch(()=>null):Promise.resolve(null)
+          clip.kind==="video"?window.playStudio.getThumbnail(clip.path,Math.min(1,sourceDuration/2)).catch(()=>null):Promise.resolve(null),
+          clip.kind==="video"?window.playStudio.getPreviewVideo(clip.path).catch(()=>undefined):Promise.resolve(undefined)
         ]);
-        return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,thumbnail:thumbnail??undefined,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",rotation:([0,90,180,270].includes(clip.rotation)?clip.rotation:0) as 0|90|180|270,flipHorizontal:clip.flipHorizontal===true,flipVertical:clip.flipVertical===true,effect:(["none","grayscale","sepia","blur","sharpen"].includes(clip.effect)?clip.effect:"none") as Clip["effect"],url:makeMediaUrl(clip.path)} as Clip;
+        return {...clip,track,sourceDuration,sourceStart,duration:clipDuration,waveform,previewUrl,thumbnail:thumbnail??undefined,volume:Number.isFinite(clip.volume)?Math.max(0,Math.min(2,clip.volume)):1,fadeIn:Number.isFinite(clip.fadeIn)?Math.max(0,Math.min(clipDuration,clip.fadeIn)):0,fadeOut:Number.isFinite(clip.fadeOut)?Math.max(0,Math.min(clipDuration,clip.fadeOut)):0,brightness:Number.isFinite(clip.brightness)?Math.max(-0.5,Math.min(0.5,clip.brightness)):0,contrast:Number.isFinite(clip.contrast)?Math.max(0.5,Math.min(2,clip.contrast)):1,saturation:Number.isFinite(clip.saturation)?Math.max(0,Math.min(2,clip.saturation)):1,title:typeof clip.title==="string"?clip.title:"",titleSize:Number.isFinite(clip.titleSize)?Math.max(12,Math.min(160,clip.titleSize)):48,titlePosition:["top","center","bottom"].includes(clip.titlePosition)?clip.titlePosition:"bottom",rotation:([0,90,180,270].includes(clip.rotation)?clip.rotation:0) as 0|90|180|270,flipHorizontal:clip.flipHorizontal===true,flipVertical:clip.flipVertical===true,effect:(["none","grayscale","sepia","blur","sharpen"].includes(clip.effect)?clip.effect:"none") as Clip["effect"],url:makeMediaUrl(clip.path)} as Clip;
       });
       setProjectName(importedProjectName);
       setTracks(normalizedTracks);
@@ -560,7 +564,7 @@ function App() {
       </aside>
       <section className="preview-panel">
         <div className="panel-heading"><b>MONITOR DE PROGRAMA</b><span className="muted">{previewClip?.name??"VISTA PREVIA"}</span></div>
-        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.url} poster={clip.thumbnail} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%) ${clip.effect==="grayscale"?"grayscale(1)":clip.effect==="sepia"?"sepia(1)":clip.effect==="blur"?"blur(2px)":clip.effect==="sharpen"?"contrast(1.12)":" "}`,transform:`rotate(${clip.rotation}deg) scaleX(${clip.flipHorizontal?-1:1}) scaleY(${clip.flipVertical?-1:1})`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onError={()=>setPreviewErrors(old=>({...old,[clip.id]:"Este archivo usa un formato o códec que Chromium no puede reproducir en la vista previa."}))} onLoadedMetadata={e=>{setPreviewErrors(old=>{if(!old[clip.id])return old;const next={...old};delete next[clip.id];return next;});const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}{previewLayers.some(layer=>previewErrors[layer.id])&&<div className="preview-error"><b>No se puede mostrar este video</b><span>{previewErrors[previewLayers.find(layer=>previewErrors[layer.id])!.id]}</span><small>Convierte el archivo a MP4 con video H.264 para editarlo en la vista previa. FFmpeg puede admitir más formatos al exportar.</small></div>}</div>:active?.kind==="audio"&&previewErrors[active.id]?<div className="empty-preview media-preview-error"><b>No se puede reproducir este audio</b><span>{previewErrors[active.id]}</span><small>Prueba convertirlo a MP3 o WAV para escuchar la vista previa.</small></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
+        <div className="preview-screen">{previewClip?<div className="preview-composite">{previewLayers.map(clip=><React.Fragment key={clip.id}><video ref={element=>{if(element)videoRefs.current[clip.id]=element;else delete videoRefs.current[clip.id];}} src={clip.previewUrl??clip.url} poster={clip.thumbnail} style={{filter:`brightness(${100+clip.brightness*100}%) contrast(${clip.contrast*100}%) saturate(${clip.saturation*100}%) ${clip.effect==="grayscale"?"grayscale(1)":clip.effect==="sepia"?"sepia(1)":clip.effect==="blur"?"blur(2px)":clip.effect==="sharpen"?"contrast(1.12)":" "}`,transform:`rotate(${clip.rotation}deg) scaleX(${clip.flipHorizontal?-1:1}) scaleY(${clip.flipVertical?-1:1})`,opacity:fadeGain(clip,Math.min(clip.duration,Math.max(0,playhead-clip.start))),zIndex:tracks.findIndex(t=>t.id===clip.track)+1}} controls={false} onError={()=>setPreviewErrors(old=>({...old,[clip.id]:"No se pudo preparar una versión compatible de este video para la vista previa."}))} onLoadedMetadata={e=>{setPreviewErrors(old=>{if(!old[clip.id])return old;const next={...old};delete next[clip.id];return next;});const wanted=clip.sourceStart+Math.min(clip.duration,Math.max(0,playhead-clip.start));e.currentTarget.currentTime=wanted;if(playing)void e.currentTarget.play().catch(()=>setPlaying(false));}} />{clip.title.trim()&&<div className={"preview-title "+clip.titlePosition} style={{fontSize:clip.titleSize+"px",zIndex:tracks.findIndex(t=>t.id===clip.track)+2}}>{clip.title}</div>}</React.Fragment>)}{previewLayers.some(layer=>previewErrors[layer.id])&&<div className="preview-error"><b>No se puede mostrar este video</b><span>{previewErrors[previewLayers.find(layer=>previewErrors[layer.id])!.id]}</span><small>La vista previa se prepara automáticamente con FFmpeg. Comprueba que el archivo no esté dañado y vuelve a importarlo si el error continúa.</small></div>}</div>:active?.kind==="audio"&&previewErrors[active.id]?<div className="empty-preview media-preview-error"><b>No se puede reproducir este audio</b><span>{previewErrors[active.id]}</span><small>Prueba convertirlo a MP3 o WAV para escuchar la vista previa.</small></div>:<div className="empty-preview"><div className="play-logo">▶</div><b>Vista previa</b><span>Agrega un video para comenzar a editar</span></div>}</div>
         <div className="transport"><button onClick={()=>{setPlayhead(0);setPlaying(false);}}>⏮</button><button className="play" onClick={togglePlayback}>{playing?"Ⅱ":"▶"}</button><button onClick={()=>{setPlayhead(contentDuration);setPlaying(false);}}>⏭</button><span>{time(playhead)} / {time(contentDuration)}</span></div>
       </section>
       <aside className="inspector">
