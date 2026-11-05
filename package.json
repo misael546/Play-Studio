@@ -32,7 +32,12 @@
     "productName": "Play Studio",
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "artifactName": "Play-Studio-Setup-${version}.${ext}"
     },
@@ -52,6 +57,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "compression": "maximum"
   }
 }
