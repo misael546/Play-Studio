@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, net } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFile, stat, unlink, rename, mkdir } from "node:fs/promises";
+import { readFile, stat, unlink, rename, mkdir, appendFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
@@ -15,6 +15,20 @@ let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
 let autosaveQueue: Promise<void> = Promise.resolve();
 const previewJobs = new Map<string, Promise<string>>();
+const diagnosticsFile = () => join(app.getPath("userData"), "play-studio-errors.log");
+async function recordDiagnostic(source: string, error: unknown) {
+  const raw = error instanceof Error ? (error.stack || error.message) : String(error);
+  const safe = raw.replaceAll(app.getPath("home"), "[CARPETA DE USUARIO]").slice(0, 12000);
+  const entry = `[${new Date().toISOString()}] [${source}]\\n${safe}\\n\\n`;
+  const file = diagnosticsFile();
+  await mkdir(join(file, ".."), { recursive: true });
+  await appendFile(file, entry, "utf8");
+  const info = await stat(file);
+  if (info.size > 512 * 1024) {
+    const content = await readFile(file, "utf8");
+    await writeFile(file, content.slice(-256 * 1024), "utf8");
+  }
+}
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; audioMuted?: boolean; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom"; rotation?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; effect?: "none" | "grayscale" | "sepia" | "blur" | "sharpen" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -45,7 +59,7 @@ function createWindow() {
   mainWindow.on("closed", () => { mainWindow = null; if (exportProcess) { exportCanceled = true; exportProcess.kill(); } });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(() => {\n  process.on("unhandledRejection", reason => { void recordDiagnostic("MAIN / PROMESA NO CONTROLADA", reason); });\n  process.on("uncaughtException", error => { void recordDiagnostic("MAIN / ERROR CRÍTICO", error).finally(() => app.quit()); });
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
@@ -65,6 +79,10 @@ app.whenReady().then(() => {
       console.error("[Play Studio] No se pudo comprobar actualizaciones:", error);
     });
   }
+  ipcMain.handle("app:version", () => app.getVersion());
+  ipcMain.handle("diagnostics:write", async (_event, source: string, message: string) => { await recordDiagnostic(String(source).slice(0,100), String(message).slice(0,12000)); return true; });
+  ipcMain.handle("diagnostics:read", async () => await readFile(diagnosticsFile(), "utf8").catch(() => ""));
+  ipcMain.handle("diagnostics:clear", async () => { await writeFile(diagnosticsFile(), "", "utf8"); return true; });
   protocol.handle("media", async (request) => {
     const encoded = new URL(request.url).pathname.slice(1);
     const filePath = Buffer.from(encoded, "base64url").toString("utf8");
