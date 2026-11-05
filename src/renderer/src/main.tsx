@@ -16,6 +16,9 @@ declare global {
       getThumbnail: (filePath: string, timestamp: number) => Promise<string | null>;
       getMediaDuration: (filePath: string) => Promise<number>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
+      autosaveProject: (data: string) => Promise<boolean>;
+      readAutosaveProject: () => Promise<string | null>;
+      clearAutosaveProject: () => Promise<boolean>;
       resetProjectPath: () => Promise<boolean>;
       acceptLoadedProject: () => Promise<boolean>;
       loadProject: () => Promise<string | null>;
@@ -236,14 +239,10 @@ function App() {
       const saved=await window.playStudio.saveProject(JSON.stringify(data,null,2),saveAs);
       if(!saved)return;
       savedProjectKeyRef.current=makeProjectKey(projectName,tracks,clips);
+      void window.playStudio.clearAutosaveProject().catch(()=>{});
     }catch(error){alert(error instanceof Error?"No se pudo guardar el proyecto: "+error.message:"No se pudo guardar el proyecto.");}
   };
-  const load = async () => {
-    if(isDirty&&!window.confirm("Abrir otro proyecto y descartar los cambios actuales? Guarda primero si los necesitas."))return;
-    let data:string|null;
-    try{data=await window.playStudio.loadProject();}
-    catch(error){alert(error instanceof Error?"No se pudo abrir el proyecto: "+error.message:"No se pudo abrir el proyecto.");return;}
-    if(!data)return;
+  const applyProjectData = async (data: string, recovered = false) => {
     setImporting(true);
     try {
       const p=JSON.parse(data);
@@ -272,15 +271,50 @@ function App() {
       setTracks(normalizedTracks);
       setClips(normalizedClips);
       setPreviewErrors({});
-      savedProjectKeyRef.current=makeProjectKey(importedProjectName,normalizedTracks,normalizedClips);
+      savedProjectKeyRef.current=recovered?"":makeProjectKey(importedProjectName,normalizedTracks,normalizedClips);
       setPlayhead(Number.isFinite(p.playhead)?Math.max(0,p.playhead):0);setSelected(null);setPlaying(false);setUndoStack([]);setRedoStack([]);
-      await window.playStudio.acceptLoadedProject();
-    } catch { alert("El archivo de proyecto no es válido."); }
+      if(!recovered)await window.playStudio.acceptLoadedProject();
+    } catch { throw new Error("El archivo de proyecto no es válido."); }
     finally { setImporting(false); }
+  };
+  const load = async () => {
+    if(isDirty&&!window.confirm("Abrir otro proyecto y descartar los cambios actuales? Guarda primero si los necesitas."))return;
+    let data:string|null;
+    try{data=await window.playStudio.loadProject();}
+    catch(error){alert(error instanceof Error?"No se pudo abrir el proyecto: "+error.message:"No se pudo abrir el proyecto.");return;}
+    if(!data)return;
+    try {
+      await applyProjectData(data,false);
+      void window.playStudio.clearAutosaveProject().catch(()=>{});
+    } catch(error) {
+      alert(error instanceof Error?error.message:"No se pudo abrir el proyecto.");
+    }
+  };
+  const recoverAutosave = async () => {
+    try {
+      const raw=await window.playStudio.readAutosaveProject();
+      if(!raw)return;
+      const backup=JSON.parse(raw);
+      const savedAt=Number(backup.savedAt);
+      if(typeof backup.project!=="string"||!Number.isFinite(savedAt)||savedAt>Date.now()+60000||Date.now()-savedAt>14*24*60*60*1000) {
+        await window.playStudio.clearAutosaveProject();
+        return;
+      }
+      if(!window.confirm("Se encontró un respaldo automático de una sesión anterior. ¿Quieres recuperar ese trabajo?")) {
+        await window.playStudio.clearAutosaveProject();
+        return;
+      }
+      await applyProjectData(backup.project,true);
+      alert("Se recuperó el respaldo automático. Guarda el proyecto para conservarlo como archivo normal.");
+    } catch(error) {
+      await window.playStudio.clearAutosaveProject().catch(()=>false);
+      alert(error instanceof Error?"No se pudo recuperar el respaldo: "+error.message:"No se pudo recuperar el respaldo.");
+    }
   };
   const newProject = () => {
     if(isDirty&&!window.confirm("¿Crear un proyecto nuevo? Se perderán los cambios que no hayas guardado."))return;
     void window.playStudio.resetProjectPath();
+    void window.playStudio.clearAutosaveProject().catch(()=>{});
     const defaultTracks:Track[]=[{id:"video-1",name:"VIDEO 1",kind:"video"},{id:"audio-1",name:"AUDIO 1",kind:"audio"}];
     savedProjectKeyRef.current=makeProjectKey("Proyecto sin título",defaultTracks,[]);
     setPreviewErrors({});
@@ -363,6 +397,18 @@ function App() {
   },[pixelsPerSecond,tracks]);
 
   useEffect(()=>{playheadRef.current=playhead;},[playhead]);
+
+  useEffect(()=>{
+    if(!isDirty||importing||exporting)return;
+    const timeout=window.setTimeout(()=>{
+      const project={version:2,name:projectName,tracks,clips:clips.map(({url,thumbnail,...clip})=>clip),playhead:playheadRef.current};
+      const backup=JSON.stringify({savedAt:Date.now(),project:JSON.stringify(project)});
+      void window.playStudio.autosaveProject(backup).catch(()=>{});
+    },3000);
+    return()=>window.clearTimeout(timeout);
+  },[isDirty,importing,exporting,projectName,tracks,clips]);
+
+  useEffect(()=>{void recoverAutosave();},[]);
 
   useEffect(()=>{
     const handleBeforeUnload=(event:BeforeUnloadEvent)=>{

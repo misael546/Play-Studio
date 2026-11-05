@@ -196,6 +196,37 @@ app.whenReady().then(() => {
     currentProjectPath = targetPath;
     return true;
   });
+  const recoveryPath = join(app.getPath("userData"), "play-studio-recovery.json");
+  ipcMain.handle("project:autosave", async (_event, data: string) => {
+    if (typeof data !== "string" || data.length > 25 * 1024 * 1024) throw new Error("El respaldo automático es demasiado grande.");
+    const fs = await import("node:fs/promises");
+    const temporaryPath = recoveryPath + "." + crypto.randomUUID() + ".tmp";
+    try {
+      await fs.mkdir(app.getPath("userData"), { recursive: true });
+      await fs.writeFile(temporaryPath, data, "utf8");
+      await fs.rename(temporaryPath, recoveryPath);
+      return true;
+    } catch (error) {
+      await fs.unlink(temporaryPath).catch(() => {});
+      throw error;
+    }
+  });
+  ipcMain.handle("project:read-autosave", async (): Promise<string | null> => {
+    try {
+      const info = await stat(recoveryPath);
+      if (!info.isFile() || info.size > 25 * 1024 * 1024) {
+        await unlink(recoveryPath).catch(() => {});
+        return null;
+      }
+      return await readFile(recoveryPath, "utf8");
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle("project:clear-autosave", async () => {
+    await unlink(recoveryPath).catch(() => {});
+    return true;
+  });
   ipcMain.handle("project:reset-path", () => { currentProjectPath = null; return true; });
   ipcMain.handle("project:accept-load", () => { if (pendingProjectPath) currentProjectPath = pendingProjectPath; pendingProjectPath = null; return true; });
   ipcMain.handle("project:load", async () => {

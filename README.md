@@ -6,6 +6,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - Importar video y audio desde el explorador de Windows.
 - Lectura de duración de medios, rechazo de archivos cuya duración no se puede leer y biblioteca del proyecto.
 - Varias pistas de video y audio, con capas superpuestas en el monitor y orden de composición según la pista.
+- Renombrar, reordenar y eliminar pistas vacías; Deshacer y Rehacer incluyen cambios de pistas y clips.
 - Formas de onda de audio generadas con FFmpeg y ajustadas al recorte del clip.
 - Miniaturas de video en la biblioteca y la línea de tiempo, generadas con FFmpeg y regeneradas al abrir proyectos.
 - Aviso en el monitor cuando Chromium no puede decodificar el formato o códec de un video.
@@ -53,4 +54,4 @@ npm run dist
 El instalador NSIS se genera en la carpeta `release`.
 
 ## Nota técnica
-Esta versión incluye el motor inicial de exportación MP4, fundidos, títulos, ajustes básicos de imagen, mezcla de audio original y pistas independientes. Las transiciones avanzadas entre clips, la recuperación automática de proyectos y las pruebas de uso real siguen pendientes.
+Esta versión incluye el motor inicial de exportación MP4, fundidos, títulos, ajustes básicos de imagen, mezcla de audio original y pistas independientes. Las transiciones avanzadas entre clips y las pruebas de uso real siguen pendientes. El respaldo automático crea una copia de recuperación local después de las modificaciones.
