@@ -82,6 +82,7 @@ function App() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [dragOverTrack, setDragOverTrack] = useState<string | null>(null);
+  const [autosavedAt, setAutosavedAt] = useState<number | null>(null);
   const [previewErrors, setPreviewErrors] = useState<Record<string,string>>({});
   const [exportProgress, setExportProgress] = useState(0);
   const [resolution,setResolution] = useState<"720p"|"1080p"|"4k">("1080p");
@@ -401,11 +402,12 @@ function App() {
   useEffect(()=>{playheadRef.current=playhead;},[playhead]);
 
   useEffect(()=>{
-    if(!isDirty||importing||exporting)return;
+    if(!isDirty||importing||exporting){if(!isDirty)setAutosavedAt(null);return;}
+    setAutosavedAt(null);
     const timeout=window.setTimeout(()=>{
       const project={version:2,name:projectName,tracks,clips:clips.map(({url,thumbnail,...clip})=>clip),playhead:playheadRef.current};
       const backup=JSON.stringify({savedAt:Date.now(),project:JSON.stringify(project)});
-      void window.playStudio.autosaveProject(backup).catch(()=>{});
+      void window.playStudio.autosaveProject(backup).then(saved=>{if(saved)setAutosavedAt(Date.now());}).catch(()=>{});
     },3000);
     return()=>window.clearTimeout(timeout);
   },[isDirty,importing,exporting,projectName,tracks,clips]);
@@ -525,7 +527,7 @@ function App() {
 
   return <div className="app">
     <header className="topbar">
-      <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO{isDirty?" •":""}</b><small>{isDirty?"CAMBIOS SIN GUARDAR":"EDITOR DE VIDEO"}</small></div></div>
+      <div className="brand"><span className="brand-mark">P</span><div><b>PLAY STUDIO{isDirty?" •":""}</b><small className={isDirty&&autosavedAt?"autosaved":""}>{isDirty?(autosavedAt?"RESPALDO LOCAL":"CAMBIOS SIN GUARDAR"):"EDITOR DE VIDEO"}</small></div></div>
       <nav><button onClick={newProject}>Nuevo proyecto</button><button onClick={load}>Abrir proyecto</button><button onClick={()=>void save()}>Guardar</button><button onClick={()=>void save(true)}>Guardar como</button><label className="export-setting">Resolución<select value={resolution} onChange={e=>setResolution(e.target.value as "720p"|"1080p"|"4k")}><option value="720p">720p</option><option value="1080p">1080p</option><option value="4k">4K</option></select></label><label className="export-setting">FPS<select value={fps} onChange={e=>setFps(Number(e.target.value) as 24|30|60)}><option value={24}>24</option><option value={30}>30</option><option value={60}>60</option></select></label><button className="export" onClick={exportVideo} disabled={exporting}>Exportar MP4</button></nav>
       <button className="assistant-toggle" onClick={()=>setAssistant(!assistant)}>✦ Asistente</button>
     </header>
