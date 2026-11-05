@@ -11,7 +11,7 @@ let exportProcess: ReturnType<typeof spawn> | null = null;
 let exportCanceled = false;
 let currentProjectPath: string | null = null;
 let pendingProjectPath: string | null = null;
-let autosaveGeneration = 0;
+let autosaveQueue: Promise<void> = Promise.resolve();
 
 type ExportClip = { path: string; kind: "video" | "audio"; start: number; sourceStart: number; duration: number; trackOrder?: number; volume?: number; fadeIn?: number; fadeOut?: number; brightness?: number; contrast?: number; saturation?: number; title?: string; titleSize?: number; titlePosition?: "top" | "center" | "bottom" };
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number) =>
@@ -200,24 +200,24 @@ app.whenReady().then(() => {
   const recoveryPath = join(app.getPath("userData"), "play-studio-recovery.json");
   ipcMain.handle("project:autosave", async (_event, data: string) => {
     if (typeof data !== "string" || data.length > 25 * 1024 * 1024) throw new Error("El respaldo automático es demasiado grande.");
-    const generation = autosaveGeneration;
-    const fs = await import("node:fs/promises");
-    const temporaryPath = recoveryPath + "." + crypto.randomUUID() + ".tmp";
-    try {
-      await fs.mkdir(app.getPath("userData"), { recursive: true });
-      await fs.writeFile(temporaryPath, data, "utf8");
-      if (generation !== autosaveGeneration) {
+    const operation = autosaveQueue.then(async () => {
+      const fs = await import("node:fs/promises");
+      const temporaryPath = recoveryPath + "." + crypto.randomUUID() + ".tmp";
+      try {
+        await fs.mkdir(app.getPath("userData"), { recursive: true });
+        await fs.writeFile(temporaryPath, data, "utf8");
+        await fs.rename(temporaryPath, recoveryPath);
+        return true;
+      } catch (error) {
         await fs.unlink(temporaryPath).catch(() => {});
-        return false;
+        throw error;
       }
-      await fs.rename(temporaryPath, recoveryPath);
-      return true;
-    } catch (error) {
-      await fs.unlink(temporaryPath).catch(() => {});
-      throw error;
-    }
+    });
+    autosaveQueue = operation.then(() => {}, () => {});
+    return await operation;
   });
   ipcMain.handle("project:read-autosave", async (): Promise<string | null> => {
+    await autosaveQueue;
     try {
       const info = await stat(recoveryPath);
       if (!info.isFile() || info.size > 25 * 1024 * 1024) {
@@ -230,8 +230,11 @@ app.whenReady().then(() => {
     }
   });
   ipcMain.handle("project:clear-autosave", async () => {
-    autosaveGeneration += 1;
-    await unlink(recoveryPath).catch(() => {});
+    const operation = autosaveQueue.then(async () => {
+      await unlink(recoveryPath).catch(() => {});
+    });
+    autosaveQueue = operation;
+    await operation;
     return true;
   });
   ipcMain.handle("project:reset-path", () => { currentProjectPath = null; return true; });
