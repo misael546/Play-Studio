@@ -3,13 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "description": "Editor de video de escritorio para Windows",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/misael546/Play-Studio.git"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never"
+    "dist": "npm run typecheck && npm run build && electron-builder --win nsis --publish never",
+    "dist:web": "npm run typecheck && npm run build && electron-builder --win nsis-web --x64 --publish always"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -34,9 +39,7 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "artifactName": "Play-Studio-Setup-${version}.${ext}"
@@ -58,10 +61,20 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "electronLanguages": [
-      "en-US",
-      "es",
-      "es-419"
-    ]
+    "nsisWeb": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "misael546",
+        "repo": "Play-Studio",
+        "releaseType": "release"
+      }
+    ],
+    "electronLanguages": ["en-US", "es", "es-419"]
   }
 }
