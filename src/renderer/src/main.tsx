@@ -258,7 +258,7 @@ function App() {
         const others=old.filter(c=>c.id!==drag.id);
         let movedStart=Math.max(0,drag.clip.start+delta);
         if(drag.mode==="move"){
-          const snapPoints=[playhead,...others.flatMap(c=>[c.start,c.start+c.duration])];
+          const snapPoints=[playheadRef.current,...others.flatMap(c=>[c.start,c.start+c.duration])];
           let bestDifference=0;
           let bestDistance=8/pixelsPerSecond;
           for(const point of snapPoints){
@@ -296,7 +296,7 @@ function App() {
       window.removeEventListener("pointercancel",onCancel);
       window.removeEventListener("blur",onCancel);
     };
-  },[pixelsPerSecond,tracks,playhead]);
+  },[pixelsPerSecond,tracks]);
 
   useEffect(()=>{playheadRef.current=playhead;},[playhead]);
 
