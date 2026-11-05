@@ -34,7 +34,7 @@ Editor de video de escritorio para Windows. Interfaz tradicional, edición por l
 - `Ctrl + Y` o `Ctrl + Shift + Z`: rehacer.
 
 ## Formatos de entrada
-MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La lectura de duración y la vista previa dependen de los códecs compatibles con Chromium; FFmpeg se usa para analizar audio y exportar.
+MP4, MOV, MKV, AVI, WebM, M4V, 3GP, MPG, MPEG, TS, MTS, M2TS, FLV, OGV, WMV, ASF, VOB, MP3, WAV, AAC, M4A, FLAC, OGG, WMA, OPUS, AIFF, AMR y APE. La vista previa depende de los códecs compatibles con Chromium y muestra avisos cuando no puede reproducir un archivo. Para la duración, Play Studio intenta primero Chromium y recurre a FFmpeg si no puede leer los metadatos. FFmpeg también genera miniaturas y se usa para analizar audio y exportar.
 
 ## Requisitos de desarrollo
 - Windows 10/11 de 64 bits
