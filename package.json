@@ -58,6 +58,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "compression": "maximum"
+    "electronLanguages": [
+      "en-US",
+      "es",
+      "es-419"
+    ]
   }
 }
