@@ -14,7 +14,7 @@ declare global {
       relinkMedia: (kind: "video" | "audio") => Promise<MediaItem | null>;
       getWaveform: (filePath: string, duration: number) => Promise<number[]>;
       getThumbnail: (filePath: string, timestamp: number) => Promise<string | null>;
-      getMediaDuration: (filePath: string) => Promise<number>;
+      getMediaDuration: (filePath: string, kind: "video" | "audio") => Promise<number>;
       saveProject: (data: string, saveAs?: boolean) => Promise<boolean>;
       autosaveProject: (data: string) => Promise<boolean>;
       readAutosaveProject: () => Promise<string | null>;
@@ -50,7 +50,7 @@ const readDuration = async (item: MediaItem): Promise<number> => {
     element.src = item.url;
   });
   if (browserDuration > 0) return browserDuration;
-  return await window.playStudio.getMediaDuration(item.path).catch(() => 0);
+  return await window.playStudio.getMediaDuration(item.path,item.kind).catch(() => 0);
 };
 const fadeGain = (clip: Clip, elapsed: number) => {
   const fadeInGain = clip.fadeIn > 0 ? elapsed / clip.fadeIn : 1;
