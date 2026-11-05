@@ -33,19 +33,20 @@ jobs:
       - name: Verify web installer outputs
         shell: pwsh
         run: |
-          $exe = Get-ChildItem release -Filter *.exe -File
-          $payload = Get-ChildItem release -Filter *.7z -File
-          if (-not $exe) { throw "No se genero el instalador web .exe" }
-          if (-not $payload) { throw "No se genero el paquete descargable .7z" }
-          Get-ChildItem release -File | Select-Object Name, Length | Format-Table -AutoSize
+          $output = "release/nsis-web"
+          $exe = Get-ChildItem $output -Filter *.exe -File
+          $payload = Get-ChildItem $output -Filter *.7z -File
+          if (-not $exe) { throw "No se genero el instalador web .exe en $output" }
+          if (-not $payload) { throw "No se genero el paquete descargable .7z en $output" }
+          Get-ChildItem $output -File | Select-Object Name, Length | Format-Table -AutoSize
 
       - name: Upload verified web installer test artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Play-Studio-Lightweight-Web-Installer-Test
           path: |
-            release/*.exe
-            release/*.7z
-            release/*.yml
+            release/nsis-web/*.exe
+            release/nsis-web/*.7z
+            release/nsis-web/*.yml
           if-no-files-found: error
           retention-days: 14
