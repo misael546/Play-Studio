@@ -1,0 +1,27 @@
+name: Publish Play Studio Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build and publish Windows installer with update metadata
+        run: npm run dist:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
