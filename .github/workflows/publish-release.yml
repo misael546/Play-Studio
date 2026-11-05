@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - "package.json"
+      - "src/main/index.ts"
+      - "src/renderer/src/main.tsx"
+      - "src/renderer/src/style.css"
       - ".github/workflows/publish-release.yml"
   workflow_dispatch:
 
