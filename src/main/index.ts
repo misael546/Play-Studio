@@ -24,6 +24,20 @@ function createWindow() {
   });
   if (process.env.ELECTRON_RENDERER_URL) mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   else mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+  mainWindow.webContents.on("will-prevent-unload", event => {
+    const window = mainWindow;
+    if (!window || window.isDestroyed()) return;
+    const choice = dialog.showMessageBoxSync(window, {
+      type: "warning",
+      title: "Cambios sin guardar",
+      message: "Hay cambios sin guardar o una operación en curso.",
+      detail: "¿Quieres salir de Play Studio de todas formas?",
+      buttons: ["Salir sin guardar", "Seguir editando"],
+      defaultId: 1,
+      cancelId: 1
+    });
+    if (choice === 0) event.preventDefault();
+  });
   mainWindow.on("closed", () => { mainWindow = null; if (exportProcess) { exportCanceled = true; exportProcess.kill(); } });
 }
 

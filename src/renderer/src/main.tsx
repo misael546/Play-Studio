@@ -346,6 +346,16 @@ function App() {
   useEffect(()=>{playheadRef.current=playhead;},[playhead]);
 
   useEffect(()=>{
+    const handleBeforeUnload=(event:BeforeUnloadEvent)=>{
+      if(!isDirty&&!importing&&!exporting)return;
+      event.preventDefault();
+      event.returnValue="Hay cambios sin guardar";
+    };
+    window.addEventListener("beforeunload",handleBeforeUnload);
+    return()=>window.removeEventListener("beforeunload",handleBeforeUnload);
+  },[isDirty,importing,exporting]);
+
+  useEffect(()=>{
     for(const clip of previewLayers){
       const video=videoRefs.current[clip.id];if(!video)continue;
       const elapsed=Math.min(clip.duration,Math.max(0,playhead-clip.start));
